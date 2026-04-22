@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>선영국가</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .loading-wrap {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    height: 100vh; gap: 16px;
+  }
+  .loading-logo {
+    font-family: 'Gmarket Sans', sans-serif;
+    font-size: 28px; font-weight: 700; color: var(--gold);
+  }
+</style>
+</head>
+<body>
+<div class="loading-wrap">
+  <div style="font-size:48px;">🏛️</div>
+  <div class="loading-logo" id="nationName">선영국가</div>
+  <div class="spinner"></div>
+</div>
+
+<script type="module">
+  import { getSession, isOfficial, isMaster } from "./auth.js";
+  import { getNationConfig } from "./db.js";
+
+  async function init() {
+    const config = await getNationConfig();
+    if (config?.name) document.getElementById("nationName").textContent = config.name;
+
+    const session = getSession();
+    if (!session) {
+      window.location.href = "pages/login.html";
+      return;
+    }
+    if (isMaster(session.role)) {
+      window.location.href = "pages/master.html";
+    } else if (isOfficial(session.role)) {
+      window.location.href = "pages/official.html";
+    } else {
+      window.location.href = "pages/me.html";
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>

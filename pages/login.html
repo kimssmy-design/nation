@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>로그인 — 선영국가</title>
+<link rel="stylesheet" href="../style.css">
+<style>
+.login-wrap { max-width: 380px; margin: 0 auto; padding: 20px; }
+.login-hero { text-align: center; padding: 30px 0 24px; }
+.login-hero .emoji { font-size: 48px; margin-bottom: 12px; }
+.login-hero h1 {
+  font-family: 'Gmarket Sans', sans-serif;
+  font-size: 24px; color: var(--gold); margin-bottom: 6px;
+}
+.login-hero p { font-size: 13px; color: var(--text-dim); }
+
+.login-card {
+  background: var(--card);
+  border: 1px solid var(--navy-light);
+  border-radius: 16px;
+  padding: 24px;
+}
+
+.login-tabs {
+  display: flex; gap: 8px; margin-bottom: 20px;
+}
+.login-tab {
+  flex: 1; padding: 8px; border-radius: 8px; border: none; cursor: pointer;
+  font-family: 'Noto Sans KR', sans-serif; font-size: 12px; font-weight: 700;
+  background: var(--navy-mid); color: var(--text-dim); transition: all 0.2s;
+}
+.login-tab.active { background: var(--gold); color: var(--navy); }
+
+.master-hint {
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: rgba(255,107,107,0.1);
+  border: 1px solid rgba(255,107,107,0.3);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--accent2);
+  text-align: center;
+}
+
+.join-link {
+  text-align: center; margin-top: 14px;
+  font-size: 12px; color: var(--text-dim);
+}
+.join-link a { color: var(--gold); text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-hero">
+    <div class="emoji">🔐</div>
+    <h1 id="nationName">선영국가</h1>
+    <p>이름과 비밀번호로 입장하세요</p>
+  </div>
+  <div class="login-card">
+    <div class="login-tabs">
+      <button class="login-tab active" onclick="switchTab('student', this)">👤 일반/공직자</button>
+      <button class="login-tab" onclick="switchTab('master', this)">👑 마스터</button>
+    </div>
+
+    <!-- 일반/공직자 탭 -->
+    <div id="tab-student">
+      <div class="input-group">
+        <label>이름 입력</label>
+        <input type="text" id="studentName" placeholder="이름을 입력하세요 (예: 김지훈)" autocomplete="off">
+      </div>
+      <div class="input-group">
+        <label>비밀번호 (숫자 4자리)</label>
+        <input type="password" id="studentPw" maxlength="4" placeholder="비밀번호 입력" inputmode="numeric">
+      </div>
+      <button class="btn btn-gold btn-full" onclick="doLoginStudent()">입장하기 →</button>
+      <div class="join-link">아직 등록 안 했나요? <a href="join.html">국민되기 →</a></div>
+    </div>
+
+    <!-- 마스터 탭 -->
+    <div id="tab-master" style="display:none;">
+      <div class="input-group">
+        <label>마스터 비밀번호</label>
+        <input type="password" id="masterPw" placeholder="마스터 비밀번호 입력" inputmode="numeric">
+      </div>
+      <button class="btn btn-gold btn-full" onclick="doLoginMaster()">마스터 입장 →</button>
+      <div class="master-hint">마스터 비밀번호는 담임선생님께 문의하세요</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+  import { loginStudent, loginMaster, getSession, isOfficial } from "../auth.js";
+  import { getNationConfig } from "../db.js";
+
+  // 이미 로그인 상태면 리다이렉트
+  const session = getSession();
+  if (session) {
+    redirectByRole(session.role);
+  }
+
+  async function loadNationName() {
+    const config = await getNationConfig();
+    if (config?.name) document.getElementById("nationName").textContent = config.name;
+  }
+
+  window.switchTab = function(tab, btn) {
+    document.querySelectorAll(".login-tab").forEach(t => t.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("tab-student").style.display = tab === "student" ? "block" : "none";
+    document.getElementById("tab-master").style.display = tab === "master" ? "block" : "none";
+  };
+
+  window.doLoginStudent = async function() {
+    const name = document.getElementById("studentName").value.trim();
+    const pw = document.getElementById("studentPw").value.trim();
+    if (!name) return showToast("이름을 입력해주세요", true);
+    if (!pw) return showToast("비밀번호를 입력해주세요", true);
+    try {
+      const student = await loginStudent(name, pw);
+      showToast("✅ 로그인 성공!");
+      setTimeout(() => redirectByRole(student.role), 800);
+    } catch (e) {
+      showToast(e.message, true);
+    }
+  };
+
+  window.doLoginMaster = async function() {
+    const pw = document.getElementById("masterPw").value.trim();
+    if (!pw) return showToast("비밀번호를 입력해주세요", true);
+    try {
+      await loginMaster(pw);
+      showToast("👑 마스터 입장!");
+      setTimeout(() => window.location.href = "master.html", 800);
+    } catch (e) {
+      showToast(e.message, true);
+    }
+  };
+
+  function redirectByRole(role) {
+    if (role === "마스터") return window.location.href = "master.html";
+    if (isOfficial(role)) return window.location.href = "official.html";
+    window.location.href = "me.html";
+  }
+
+  // 엔터키 로그인
+  document.addEventListener("keydown", e => {
+    if (e.key === "Enter") {
+      const masterTab = document.getElementById("tab-master");
+      if (masterTab.style.display !== "none") doLoginMaster();
+      else doLoginStudent();
+    }
+  });
+
+  function showToast(msg, isError = false) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.className = "toast show" + (isError ? " error" : "");
+    setTimeout(() => t.className = "toast", 2500);
+  }
+
+  loadNationName();
+</script>
+</body>
+</html>
