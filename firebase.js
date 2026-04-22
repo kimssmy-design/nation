@@ -1,4 +1,4 @@
-// firebase.js — Firebase 초기화 및 공통 설정
+// firebase.js — Firebase 초기화 및 공통설정
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
