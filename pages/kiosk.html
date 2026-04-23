@@ -359,16 +359,19 @@ body {
         statShopLabel.textContent = '닫힘';
       }
 
+      // 테스터 제외
+      const realStudents = students.filter(s => s.role !== "테스터");
+
       // 통계
-      const total = students.reduce((s, st) => s + (st.balance || 0), 0);
-      const avg = students.length > 0 ? Math.round(total / students.length) : 0;
+      const total = realStudents.reduce((s, st) => s + (st.balance || 0), 0);
+      const avg = realStudents.length > 0 ? Math.round(total / realStudents.length) : 0;
       document.getElementById('stat-total').textContent = total.toLocaleString();
-      document.getElementById('stat-count').textContent = students.length;
+      document.getElementById('stat-count').textContent = realStudents.length;
       document.getElementById('stat-avg').textContent = avg.toLocaleString();
 
       // 자산 랭킹
       const rankNums = ['r1','r2','r3','r4','r5'];
-      const sorted = [...students].sort((a,b) => (b.balance||0) - (a.balance||0)).slice(0,5);
+      const sorted = [...realStudents].sort((a,b) => (b.balance||0) - (a.balance||0)).slice(0,5);
       document.getElementById('rank-money').innerHTML = sorted.length > 0
         ? sorted.map((s,i) => `
             <div class="rank-item">

@@ -318,13 +318,18 @@
     allStudentNames = config?.studentNames || [];
 
     // 요약
-    const totalMoney = students.reduce((s, st) => s + (st.balance || 0), 0);
+    const realStudents = students.filter(s => s.role !== "테스터");
+    const totalMoney = realStudents.reduce((s, st) => s + (st.balance || 0), 0);
     const reports = await getAllReports();
     const pending = reports.filter(r => r.status !== "처리완료").length;
-    const joined = students.length;
-    const unjoined = allStudentNames.length - joined;
+    const realNames = allStudentNames.filter(n => {
+      const s = students.find(st => st.name === n);
+      return !s || s.role !== "테스터";
+    });
+    const joined = realStudents.length;
+    const unjoined = realNames.length - joined;
 
-    document.getElementById("s-total").textContent = allStudentNames.length + "명";
+    document.getElementById("s-total").textContent = realNames.length + "명";
     document.getElementById("s-money").textContent = totalMoney.toLocaleString();
     document.getElementById("s-report").textContent = pending + "건";
     document.getElementById("s-unjoined").textContent = unjoined + "명";
@@ -344,7 +349,7 @@
     allStudents.forEach(s => joinedMap[s.name] = s);
 
     const roleColors = {
-      "국민":"badge-blue", "은행원":"badge-gold", "세금징수원":"badge-gold",
+      "국민":"badge-blue", "테스터":"badge-red", "은행원":"badge-gold", "세금징수원":"badge-gold",
       "매점지기":"badge-gold", "주식중개인":"badge-gold", "검사":"badge-gold",
       "기자":"badge-gold", "청소원":"badge-gold", "국회의장":"badge-gold", "감찰관":"badge-gold"
     };
@@ -360,7 +365,7 @@
           <td style="font-weight:700;">${name}</td>
           <td>
             <select onchange="doChangeRole('${name}', this.value)" style="background:var(--navy-mid);border:1px solid var(--navy-light);border-radius:6px;padding:4px 8px;color:var(--text);font-size:12px;font-family:'Noto Sans KR',sans-serif;">
-              ${["국민","은행원","세금징수원","매점지기","주식중개인","검사","기자","청소원","국회의장","감찰관"].map(r =>
+              ${["국민","은행원","세금징수원","매점지기","주식중개인","검사","기자","청소원","국회의장","감찰관","테스터"].map(r =>
                 `<option value="${r}" ${role===r?"selected":""}>${r}</option>`
               ).join("")}
             </select>
