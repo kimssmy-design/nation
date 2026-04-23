@@ -284,7 +284,7 @@
 
 <script type="module">
   import { getNationConfig, getAllStudents, getStudentByName, addTransaction, addShopLog } from "../db.js";
-  import { getSession } from "../auth.js";
+  import { getSession, hashPassword } from "../auth.js";
 
   // 결제 금액 목록 (나중에 추가 가능)
   const AMOUNTS = [
@@ -376,7 +376,10 @@
     if (!pw) return showToast("비밀번호를 입력해주세요", true);
 
     const student = await getStudentByName(selectedName);
-    if (!student || student.password !== pw) return showToast("비밀번호가 틀렸어요", true);
+    const hashed = await hashPassword(pw);
+    if (!student || (student.password !== hashed && student.password !== pw)) {
+      return showToast("비밀번호가 틀렸어요", true);
+    }
 
     currentStudent = student;
     showAmountPanel();

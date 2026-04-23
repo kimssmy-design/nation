@@ -3,7 +3,7 @@
 import { db } from "./firebase.js";
 import {
   doc, getDoc, setDoc, updateDoc, addDoc,
-  collection, getDocs, serverTimestamp
+  collection, query, where, getDocs, orderBy, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // 국가 설정
@@ -74,11 +74,13 @@ export async function addTransaction(name, amount, type, memo, by) {
   await updateDoc(doc(db, "students", name), { balance: (student.balance || 0) + amount });
 }
 export async function getTransactions(name) {
-  const snap = await getDocs(collection(db, "transactions"));
-  return snap.docs
-    .map(d => ({ id: d.id, ...d.data() }))
-    .filter(d => d.name === name)
-    .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+  const q = query(
+    collection(db, "transactions"),
+    where("name", "==", name),
+    orderBy("createdAt", "desc")
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
 // 공지
@@ -126,11 +128,13 @@ export async function issueFine(targetName, amount, reason, by) {
   await addDoc(collection(db, "fines"), { targetName, amount, reason, by, paid: false, createdAt: serverTimestamp() });
 }
 export async function getFines(name) {
-  const snap = await getDocs(collection(db, "fines"));
-  return snap.docs
-    .map(d => ({ id: d.id, ...d.data() }))
-    .filter(d => d.targetName === name)
-    .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+  const q = query(
+    collection(db, "fines"),
+    where("targetName", "==", name),
+    orderBy("createdAt", "desc")
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 export async function payFine(fineId, studentName, amount, by) {
   await updateDoc(doc(db, "fines", fineId), { paid: true });

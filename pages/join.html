@@ -100,6 +100,7 @@
 <script type="module">
   import { getAllStudents, registerStudent } from "../db.js";
   import { getNationConfig } from "../db.js";
+  import { hashPassword } from "../auth.js";
 
   let selectedName = "";
 
@@ -148,7 +149,8 @@
     btn.textContent = "등록 중...";
 
     try {
-      await registerStudent(selectedName, pw1);
+      const hashed = await hashPassword(pw1);
+      await registerStudent(selectedName, hashed);
       showToast("🎉 국민 등록 완료!");
       setTimeout(() => window.location.href = "login.html", 1200);
     } catch (e) {
