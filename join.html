@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>국민되기 — 선영국가</title>
+<link rel="stylesheet" href="../style.css">
+<style>
+.join-wrap { max-width: 400px; margin: 0 auto; padding: 20px; }
+.join-hero { text-align: center; padding: 30px 0 24px; }
+.join-hero .emoji { font-size: 52px; margin-bottom: 12px; }
+.join-hero h1 {
+  font-family: 'Gmarket Sans', sans-serif;
+  font-size: 26px; font-weight: 700;
+  color: var(--gold); margin-bottom: 6px;
+}
+.join-hero p { font-size: 13px; color: var(--text-dim); line-height: 1.6; }
+
+.join-card {
+  background: var(--card);
+  border: 1px solid var(--navy-light);
+  border-radius: 16px;
+  padding: 24px;
+}
+
+.name-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.name-chip {
+  background: var(--navy-mid);
+  border: 1px solid var(--navy-light);
+  border-radius: 8px;
+  padding: 8px 4px;
+  text-align: center;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'Noto Sans KR', sans-serif;
+}
+.name-chip:hover { border-color: var(--gold); color: var(--gold); }
+.name-chip.selected {
+  background: rgba(255,215,0,0.15);
+  border-color: var(--gold);
+  color: var(--gold);
+  font-weight: 700;
+}
+.name-chip.taken {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.login-link {
+  text-align: center;
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.login-link a { color: var(--gold); text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="join-wrap">
+  <div class="join-hero">
+    <div class="emoji">🏛️</div>
+    <h1 id="nationName">선영국가</h1>
+    <p>이름을 선택하고 비밀번호를 설정하면<br>로그인이 가능해집니다!</p>
+  </div>
+  <div class="join-card">
+    <div class="input-group">
+      <label>내 이름 선택</label>
+      <div class="name-grid" id="nameGrid">
+        <div class="spinner"></div>
+      </div>
+    </div>
+    <div class="input-group" style="margin-top:8px;">
+      <label>선택된 이름</label>
+      <input type="text" id="selectedName" readonly placeholder="위에서 이름을 선택하세요">
+    </div>
+    <div class="input-group">
+      <label>비밀번호 설정 (숫자 4자리)</label>
+      <input type="password" id="pw1" maxlength="4" placeholder="예: 1234" inputmode="numeric">
+    </div>
+    <div class="input-group">
+      <label>비밀번호 확인</label>
+      <input type="password" id="pw2" maxlength="4" placeholder="다시 입력" inputmode="numeric">
+    </div>
+    <button class="btn btn-gold btn-full" id="joinBtn" onclick="doJoin()">🎉 국민 등록하기</button>
+    <div class="login-link">이미 등록했나요? <a href="login.html">로그인하기 →</a></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+  import { getAllStudents, registerStudent } from "../db.js";
+  import { getNationConfig } from "../db.js";
+
+  let selectedName = "";
+
+  // 국가 이름 표시
+  async function loadNationName() {
+    const config = await getNationConfig();
+    if (config?.name) document.getElementById("nationName").textContent = config.name;
+  }
+
+  // 학생 이름 목록 로드
+  async function loadNames() {
+    const [students, config] = await Promise.all([getAllStudents(), getNationConfig()]);
+    const allNames = config?.studentNames || [];
+
+    const grid = document.getElementById("nameGrid");
+    if (allNames.length === 0) {
+      grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--text-dim);font-size:12px;padding:10px;">담임선생님이 아직 학생 명단을 등록하지 않았어요</div>`;
+      return;
+    }
+
+    // preCreated가 아닌 경우만 taken (이미 비번 설정 완료)
+    const fullTaken = students.filter(s => !s.preCreated).map(s => s.id);
+
+    grid.innerHTML = allNames.map(name => {
+      const taken = fullTaken.includes(name);
+      return `<div class="name-chip ${taken ? "taken" : ""}" onclick="selectName('${name}')">${name}${taken ? " ✓" : ""}</div>`;
+    }).join("");
+  }
+
+  window.selectName = function(name) {
+    selectedName = name;
+    document.getElementById("selectedName").value = name;
+    document.querySelectorAll(".name-chip").forEach(c => c.classList.remove("selected"));
+    event.target.classList.add("selected");
+  };
+
+  window.doJoin = async function() {
+    const pw1 = document.getElementById("pw1").value.trim();
+    const pw2 = document.getElementById("pw2").value.trim();
+    if (!selectedName) return showToast("이름을 선택해주세요", true);
+    if (pw1.length !== 4 || !/^\d{4}$/.test(pw1)) return showToast("숫자 4자리를 입력해주세요", true);
+    if (pw1 !== pw2) return showToast("비밀번호가 일치하지 않아요", true);
+
+    const btn = document.getElementById("joinBtn");
+    btn.disabled = true;
+    btn.textContent = "등록 중...";
+
+    try {
+      await registerStudent(selectedName, pw1);
+      showToast("🎉 국민 등록 완료!");
+      setTimeout(() => window.location.href = "login.html", 1200);
+    } catch (e) {
+      showToast(e.message, true);
+      btn.disabled = false;
+      btn.textContent = "🎉 국민 등록하기";
+    }
+  };
+
+  function showToast(msg, isError = false) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.className = "toast show" + (isError ? " error" : "");
+    setTimeout(() => t.className = "toast", 2500);
+  }
+
+  loadNationName();
+  loadNames();
+</script>
+</body>
+</html>
