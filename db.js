@@ -130,3 +130,22 @@ export async function payFine(fineId, studentName, amount, by) {
   await updateDoc(doc(db, "fines", fineId), { paid: true });
   await addTransaction(studentName, -amount, "벌금", "벌금 납부", by);
 }
+
+// ══════════════════════════════
+// 매점 판매 로그
+// ══════════════════════════════
+
+// 판매 기록 추가
+export async function addShopLog(buyer, amount, item, by) {
+  await addDoc(collection(db, "shopLogs"), {
+    buyer, amount, item, by,
+    createdAt: serverTimestamp(),
+  });
+}
+
+// 전체 판매 로그 조회
+export async function getShopLogs() {
+  const q = query(collection(db, "shopLogs"), orderBy("createdAt", "desc"));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
