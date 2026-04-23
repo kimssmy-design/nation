@@ -402,11 +402,16 @@
       return;
     }
 
-    const total = allStudentNames.length;
+    // 테스터 제외한 실제 학생 이름 목록
+    const realNameList = allStudentNames.filter(n => {
+      const s = allStudents.find(st => st.name === n);
+      return !s || s.role !== "테스터";
+    });
+    const total = realNameList.length;
     document.getElementById("noticeStatList").innerHTML = notices.map(n => {
-      const confirmed = n.confirmedBy || [];
+      const confirmed = (n.confirmedBy || []).filter(c => realNameList.includes(c));
       const pct = total > 0 ? Math.round(confirmed.length / total * 100) : 0;
-      const unconfirmed = allStudentNames.filter(name => !confirmed.includes(name));
+      const unconfirmed = realNameList.filter(name => !confirmed.includes(name));
       return `
         <div class="notice-stat-item">
           <div class="notice-stat-top">
