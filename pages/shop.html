@@ -284,6 +284,7 @@
 
 <script type="module">
   import { getNationConfig, getAllStudents, getStudentByName, addTransaction, addShopLog } from "../db.js";
+  import { getSession } from "../auth.js";
 
   // 결제 금액 목록 (나중에 추가 가능)
   const AMOUNTS = [
@@ -312,6 +313,17 @@
       return;
     }
 
+    // 이미 로그인 상태면 바로 STEP2로
+    const session = getSession();
+    if (session && session.name) {
+      const student = await getStudentByName(session.name);
+      if (student) {
+        currentStudent = student;
+        showAmountPanel();
+        return;
+      }
+    }
+
     loadNames();
   }
 
@@ -338,6 +350,26 @@
     event.target.classList.add("selected");
   };
 
+  function showAmountPanel() {
+    document.getElementById("panel-login").style.display = "none";
+    document.getElementById("panel-amount").style.display = "block";
+    document.getElementById("step1").className = "step done";
+    document.getElementById("step1").textContent = "✓";
+    document.getElementById("step2").className = "step active";
+
+    document.getElementById("balanceName").textContent = currentStudent.name;
+    document.getElementById("balanceAmount").textContent = (currentStudent.balance || 0).toLocaleString() + "원";
+
+    document.getElementById("amountGrid").innerHTML = AMOUNTS.map(a => {
+      const insufficient = (currentStudent.balance || 0) < a.value;
+      return `
+        <div class="amount-btn ${insufficient ? "disabled" : ""}" onclick="${insufficient ? `showInsufficient(${a.value})` : `selectAmount(${a.value}, this)`}">
+          <div class="price">${a.label}</div>
+          <div class="price-label">${insufficient ? "잔고 부족 🚫" : "탭하여 선택"}</div>
+        </div>`;
+    }).join("");
+  }
+
   window.doShopLogin = async function() {
     if (!selectedName) return showToast("이름을 선택해주세요", true);
     const pw = document.getElementById("shopPw").value.trim();
@@ -347,26 +379,7 @@
     if (!student || student.password !== pw) return showToast("비밀번호가 틀렸어요", true);
 
     currentStudent = student;
-
-    // STEP 2로 이동
-    document.getElementById("panel-login").style.display = "none";
-    document.getElementById("panel-amount").style.display = "block";
-    document.getElementById("step1").className = "step done";
-    document.getElementById("step1").textContent = "✓";
-    document.getElementById("step2").className = "step active";
-
-    document.getElementById("balanceName").textContent = student.name;
-    document.getElementById("balanceAmount").textContent = (student.balance || 0).toLocaleString() + "원";
-
-    // 금액 버튼 렌더링
-    document.getElementById("amountGrid").innerHTML = AMOUNTS.map(a => {
-      const insufficient = (student.balance || 0) < a.value;
-      return `
-        <div class="amount-btn ${insufficient ? "disabled" : ""}" onclick="${insufficient ? `showInsufficient(${a.value})` : `selectAmount(${a.value}, this)`}">
-          <div class="price">${a.label}</div>
-          <div class="price-label">${insufficient ? "잔고 부족 🚫" : "탭하여 선택"}</div>
-        </div>`;
-    }).join("");
+    showAmountPanel();
   };
 
   window.selectAmount = function(amount, el) {
