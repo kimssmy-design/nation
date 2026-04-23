@@ -3,7 +3,7 @@
 import { db } from "./firebase.js";
 import {
   doc, getDoc, setDoc, updateDoc, addDoc,
-  collection, query, where, getDocs, orderBy, serverTimestamp
+  collection, getDocs, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // 국가 설정
@@ -74,16 +74,19 @@ export async function addTransaction(name, amount, type, memo, by) {
   await updateDoc(doc(db, "students", name), { balance: (student.balance || 0) + amount });
 }
 export async function getTransactions(name) {
-  const q = query(collection(db, "transactions"), where("name", "==", name), orderBy("createdAt", "desc"));
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const snap = await getDocs(collection(db, "transactions"));
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .filter(d => d.name === name)
+    .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
 }
 
 // 공지
 export async function getNotices() {
-  const q = query(collection(db, "notices"), orderBy("createdAt", "desc"));
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const snap = await getDocs(collection(db, "notices"));
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
 }
 export async function addNotice(title, content, by) {
   await addDoc(collection(db, "notices"), { title, content, by, confirmedBy: [], createdAt: serverTimestamp() });
@@ -105,9 +108,10 @@ export async function addReport(reporterName, type, content) {
   });
 }
 export async function getAllReports() {
-  const q = query(collection(db, "reports"), orderBy("createdAt", "desc"));
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const snap = await getDocs(collection(db, "reports"));
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
 }
 export async function getPublicReports() {
   const reports = await getAllReports();
@@ -122,9 +126,11 @@ export async function issueFine(targetName, amount, reason, by) {
   await addDoc(collection(db, "fines"), { targetName, amount, reason, by, paid: false, createdAt: serverTimestamp() });
 }
 export async function getFines(name) {
-  const q = query(collection(db, "fines"), where("targetName", "==", name), orderBy("createdAt", "desc"));
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const snap = await getDocs(collection(db, "fines"));
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .filter(d => d.targetName === name)
+    .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
 }
 export async function payFine(fineId, studentName, amount, by) {
   await updateDoc(doc(db, "fines", fineId), { paid: true });

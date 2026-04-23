@@ -239,7 +239,7 @@
     <div style="font-size:13px;font-weight:700;color:var(--text-dim);margin-bottom:12px;letter-spacing:1px;">결제 금액 선택</div>
     <div class="amount-grid" id="amountGrid"></div>
 
-    <button class="btn btn-outline btn-full" onclick="resetShop()" style="margin-top:4px;">← 처음으로</button>
+    <button class="btn btn-outline btn-full" onclick="goBack()" style="margin-top:4px;">← 처음으로</button>
   </div>
 </div>
 
@@ -459,6 +459,15 @@
 
   window.closeFail = function() {
     document.getElementById("failOverlay").style.display = "none";
+  };
+
+  window.goBack = function() {
+    const session = getSession();
+    if (session) {
+      window.location.href = "me.html";
+    } else {
+      resetShop();
+    }
   };
 
   window.resetShop = function() {

@@ -51,6 +51,7 @@
 <body>
 <div class="app-header">
   <div class="app-logo">🚨 신고센터<span>선영국가</span></div>
+  <button class="btn btn-outline btn-sm" onclick="doLogout()">로그아웃</button>
 </div>
 
 <div class="report-wrap has-bottom-nav">
@@ -100,7 +101,7 @@
 <div class="toast" id="toast"></div>
 
 <script type="module">
-  import { requireLogin } from "../auth.js";
+  import { requireLogin, clearSession } from "../auth.js";
   import { addReport, getPublicReports, getStudentByName } from "../db.js";
 
   const session = requireLogin();
@@ -161,6 +162,11 @@
       btn.disabled = false;
       btn.textContent = "🚨 신고 접수하기";
     }
+  };
+
+  window.doLogout = function() {
+    clearSession();
+    window.location.href = "login.html";
   };
 
   window.openStock = function() {
