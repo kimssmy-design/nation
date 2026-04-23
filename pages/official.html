@@ -115,8 +115,8 @@
       { id: "fine-manage", label: "📄 고지서 관리" },
     ],
     "매점지기": [
-      { id: "shop", label: "🛒 매점 운영" },
       { id: "log", label: "📋 판매기록" },
+      { id: "shop-status", label: "🔓 매점 열기/닫기" },
     ],
     "기자": [
       { id: "notice-write", label: "📢 공지 작성" },
@@ -178,6 +178,7 @@
       case "fine-manage": container.innerHTML = await renderFineManage(); break;
       case "fine-issue": container.innerHTML = renderFineIssue(); break;
       case "shop": container.innerHTML = await renderShop(); break;
+      case "shop-status": container.innerHTML = await renderShopStatus(); break;
       case "notice-write": container.innerHTML = renderNoticeWrite(); break;
       case "report-manage": container.innerHTML = await renderReportManage(); break;
       case "event": container.innerHTML = renderEvent(); break;
@@ -277,6 +278,23 @@
           <input type="text" id="fine-reason" placeholder="예: 매점 물품 무단 취득">
         </div>
         <button class="btn btn-danger btn-full" id="fine-issue-btn">고지서 발행하기</button>
+      </div>`;
+  }
+
+  // ── 매점지기: 열기/닫기만 ──
+  async function renderShopStatus() {
+    const config = await getNationConfig();
+    const isOpen = config?.shopOpen;
+    return `
+      <div class="card" style="text-align:center;padding:30px;">
+        <div style="font-size:52px;margin-bottom:16px;">${isOpen ? "🟢" : "🔒"}</div>
+        <div style="font-size:18px;font-weight:700;margin-bottom:8px;">매점 현재 ${isOpen ? "영업중" : "닫힘"}</div>
+        <div style="font-size:13px;color:var(--text-dim);margin-bottom:24px;">
+          ${isOpen ? "매점을 닫으려면 아래 버튼을 누르세요" : "매점을 열려면 아래 버튼을 누르세요"}
+        </div>
+        <button class="btn ${isOpen ? "btn-danger" : "btn-gold"}" id="shop-toggle-btn" style="min-width:160px;">
+          ${isOpen ? "🔒 매점 닫기" : "🟢 매점 열기"}
+        </button>
       </div>`;
   }
 
@@ -509,7 +527,7 @@
       const { setNationConfig } = await import("../db.js");
       await setNationConfig({ shopOpen: !config?.shopOpen });
       showToast(`매점 ${!config?.shopOpen ? "오픈" : "마감"}!`);
-      renderPanel("shop");
+      renderPanel("shop-status");
     };
 
     // 매점 판매

@@ -283,7 +283,7 @@
 <div class="toast" id="toast"></div>
 
 <script type="module">
-  import { getNationConfig, getAllStudents, getStudentByName, addTransaction } from "../db.js";
+  import { getNationConfig, getAllStudents, getStudentByName, addTransaction, addShopLog } from "../db.js";
 
   // 결제 금액 목록 (나중에 추가 가능)
   const AMOUNTS = [
@@ -362,9 +362,9 @@
     document.getElementById("amountGrid").innerHTML = AMOUNTS.map(a => {
       const insufficient = (student.balance || 0) < a.value;
       return `
-        <div class="amount-btn ${insufficient ? "disabled" : ""}" ${insufficient ? "" : `onclick="selectAmount(${a.value}, this)"`}>
+        <div class="amount-btn ${insufficient ? "disabled" : ""}" onclick="${insufficient ? `showInsufficient(${a.value})` : `selectAmount(${a.value}, this)`}">
           <div class="price">${a.label}</div>
-          <div class="price-label">${insufficient ? "잔고 부족" : "탭하여 선택"}</div>
+          <div class="price-label">${insufficient ? "잔고 부족 🚫" : "탭하여 선택"}</div>
         </div>`;
     }).join("");
   };
@@ -410,6 +410,7 @@
         `매점 결제 ${selectedAmount.toLocaleString()}원`,
         "매점키오스크"
       );
+      await addShopLog(currentStudent.name, selectedAmount, "매점 구매", "매점키오스크");
 
       const newBalance = balance - selectedAmount;
 
@@ -434,6 +435,13 @@
     } catch(e) {
       showToast("결제 오류: " + e.message, true);
     }
+  };
+
+  window.showInsufficient = function(amount) {
+    const balance = currentStudent?.balance || 0;
+    document.getElementById("failDesc").innerHTML =
+      `현재 잔고: <strong>${balance.toLocaleString()}원</strong><br>결제 금액: <strong>${amount.toLocaleString()}원</strong><br><br>잔고가 부족해요!<br>선생님께 가상화폐를 요청하세요.`;
+    document.getElementById("failOverlay").style.display = "flex";
   };
 
   window.closeFail = function() {
