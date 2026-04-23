@@ -145,7 +145,9 @@ export async function addShopLog(buyer, amount, item, by, payType = "앱결제")
 
 // 전체 판매 로그 조회
 export async function getShopLogs() {
-  const q = query(collection(db, "shopLogs"), orderBy("createdAt", "desc"));
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  // orderBy 없이 가져와서 JS에서 정렬 (인덱스 오류 방지)
+  const snap = await getDocs(collection(db, "shopLogs"));
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
 }
