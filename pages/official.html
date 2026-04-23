@@ -85,7 +85,8 @@
     addTransaction, getTransactions, getFines, payFine,
     getNotices, addNotice,
     getAllReports, updateReport, issueFine,
-    addReport, addShopLog, getShopLogs
+    addReport, addShopLog, getShopLogs,
+    getMissionApps, approveMission, rejectMission
   } from "../db.js";
 
   const session = requireLogin();
@@ -108,6 +109,7 @@
   const roleTabs = {
     "은행원": [
       { id: "give", label: "💰 지급처리" },
+      { id: "save", label: "💵 저금처리" },
       { id: "log", label: "📋 처리기록" },
     ],
     "세금징수원": [
@@ -134,6 +136,7 @@
     ],
     "감찰관": [
       { id: "event", label: "🎯 이벤트 보너스" },
+      { id: "mission-approve", label: "✅ 미션 승인" },
       { id: "report-manage", label: "🚨 신고 확인" },
     ],
     "청소원": [
@@ -184,6 +187,8 @@
       case "event": container.innerHTML = renderEvent(); break;
       case "lottery": container.innerHTML = await renderLottery(); break;
       case "stock": container.innerHTML = renderStock(); break;
+      case "save": container.innerHTML = await renderSave(); break;
+      case "mission-approve": container.innerHTML = await renderMissionApprove(); break;
       case "log": container.innerHTML = await renderLog(); break;
       default: container.innerHTML = `<div class="empty-state"><div class="emoji">🏛️</div>준비 중이에요</div>`;
     }
@@ -427,6 +432,51 @@
       </div>`;
   }
 
+  // ── 은행원: 저금처리 ──
+  async function renderSave() {
+    const students = await getAllStudents();
+    const opts = students.map(s => `<option value="${s.name}">${s.name} (${(s.balance||0).toLocaleString()}원)</option>`).join("");
+    return `
+      <div class="card">
+        <div style="font-size:14px;font-weight:700;margin-bottom:12px;">💵 실물 화폐 → 가상자산 저금처리</div>
+        <div style="font-size:12px;color:var(--text-dim);padding:8px;background:rgba(79,195,247,0.1);border-radius:8px;margin-bottom:14px;">
+          학생에게 실물 화폐를 받고 아래에서 금액을 입력하면 가상자산으로 변환됩니다.
+        </div>
+        <div class="input-group"><label>저금 학생</label>
+          <select id="save-target"><option value="">-- 선택 --</option>${opts}</select>
+        </div>
+        <div class="input-group"><label>저금 금액 (원)</label>
+          <select id="save-amount">
+            <option value="500">500원</option>
+            <option value="1000">1,000원</option>
+            <option value="2000">2,000원</option>
+            <option value="3000">3,000원</option>
+            <option value="5000">5,000원</option>
+          </select>
+        </div>
+        <button class="btn btn-gold btn-full" id="save-btn">💵 저금 처리하기</button>
+      </div>`;
+  }
+
+  // ── 감찰관: 미션 승인 ──
+  async function renderMissionApprove() {
+    const apps = await getMissionApps();
+    const pending = apps.filter(a => a.status === "신청");
+    if (pending.length === 0) return `<div class="empty-state"><div class="emoji">✅</div>대기 중인 미션 신청이 없어요</div>`;
+    return pending.map(a => {
+      const date = a.createdAt?.toDate ? a.createdAt.toDate().toLocaleDateString("ko-KR",{month:"numeric",day:"numeric"}) : "";
+      return `
+        <div class="card" style="margin-bottom:10px;">
+          <div style="font-size:15px;font-weight:700;margin-bottom:4px;">🎯 ${a.missionTitle}</div>
+          <div style="font-size:13px;color:var(--text-dim);margin-bottom:10px;">${a.studentName} · ${date}</div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-gold btn-sm mission-approve-btn" data-id="${a.id}" data-name="${a.studentName}" data-reward="${a.reward||0}">✅ 승인</button>
+            <button class="btn btn-danger btn-sm mission-reject-btn" data-id="${a.id}">❌ 반려</button>
+          </div>
+        </div>`;
+    }).join("");
+  }
+
   // ── 공통: 처리 기록 ──
   async function renderLog() {
     // 매점지기는 판매 로그 표시
@@ -592,6 +642,41 @@
       document.getElementById("shop-buyer").value = "";
       document.getElementById("shop-item").value = "";
     };
+
+    // 저금처리
+    const saveBtn = document.getElementById("save-btn");
+    if (saveBtn) saveBtn.onclick = async () => {
+      const target = document.getElementById("save-target").value;
+      const amount = parseInt(document.getElementById("save-amount").value);
+      if (!target) return showToast("학생을 선택해주세요", true);
+      saveBtn.disabled = true;
+      try {
+        await addTransaction(target, amount, "기타", `저금 +${amount.toLocaleString()}원`, name);
+        showToast(`✅ ${target} 저금 ${amount.toLocaleString()}원 처리 완료!`);
+        document.getElementById("save-target").value = "";
+      } catch(e) {
+        showToast("오류: " + e.message, true);
+      } finally { saveBtn.disabled = false; }
+    };
+
+    // 미션 승인/반려
+    document.querySelectorAll(".mission-approve-btn").forEach(btn => {
+      btn.onclick = async () => {
+        btn.disabled = true;
+        const missions = await import("../db.js");
+        await approveMission(btn.dataset.id, btn.dataset.name, parseInt(btn.dataset.reward), name);
+        showToast(`✅ ${btn.dataset.name} 미션 승인 완료! +${parseInt(btn.dataset.reward).toLocaleString()}원 지급`);
+        renderPanel("mission-approve");
+      };
+    });
+    document.querySelectorAll(".mission-reject-btn").forEach(btn => {
+      btn.onclick = async () => {
+        btn.disabled = true;
+        await rejectMission(btn.dataset.id);
+        showToast("❌ 미션 반려 처리됐어요");
+        renderPanel("mission-approve");
+      };
+    });
 
     // 현금 판매 기록
     const cashSellBtn = document.getElementById("cash-sell-btn");

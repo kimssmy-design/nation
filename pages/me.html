@@ -99,10 +99,24 @@
     <button onclick="refreshAll()" style="background:transparent;border:none;cursor:pointer;font-size:20px;padding:4px;" title="새로고침">🔄</button>
   </div>
 
+  <!-- 청약 진행바 -->
+  <div id="savingBar" style="display:none;background:var(--card);border:1px solid var(--navy-light);border-radius:12px;padding:12px 16px;margin-bottom:12px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <div style="font-size:12px;font-weight:700;color:var(--text-dim);">🏠 청약 목표</div>
+      <div style="font-size:12px;color:var(--gold);font-weight:700;" id="savingText">0 / 5,000원</div>
+    </div>
+    <div style="background:var(--navy-mid);border-radius:4px;height:8px;overflow:hidden;">
+      <div id="savingFill" style="height:100%;background:linear-gradient(to right,var(--gold),var(--accent));border-radius:4px;transition:width 0.5s;width:0%;"></div>
+    </div>
+    <div style="font-size:11px;color:var(--text-dim);margin-top:4px;" id="savingMsg"></div>
+  </div>
+
   <!-- 탭 -->
-  <div class="tab-bar">
-    <button class="tab-btn active" onclick="switchTab('tx', this)">💸 거래내역</button>
-    <button class="tab-btn" onclick="switchTab('notice', this)">📢 공지확인</button>
+  <div class="tab-bar" style="overflow-x:auto;">
+    <button class="tab-btn active" onclick="switchTab('tx', this)">💸 거래</button>
+    <button class="tab-btn" onclick="switchTab('notice', this)">📢 공지</button>
+    <button class="tab-btn" onclick="switchTab('diary', this)">📓 일지</button>
+    <button class="tab-btn" onclick="switchTab('mission', this)">🎯 미션</button>
     <button class="tab-btn" onclick="switchTab('fine', this)">📄 고지서</button>
   </div>
 
@@ -124,6 +138,28 @@
       <div class="emoji">📢</div>
       등록된 공지가 없어요
     </div>
+  </div>
+
+  <!-- 시민일지 -->
+  <div id="panel-diary" style="display:none;">
+    <div class="card" style="margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div style="font-size:14px;font-weight:700;">📓 이번 주 시민일지</div>
+        <div id="diaryWeekCount" style="font-size:12px;color:var(--text-dim);"></div>
+      </div>
+      <textarea id="diaryContent" placeholder="오늘 선영국가에서 느낀 점을 한 줄로 써보세요! (주 3회 이상 작성 시 1회당 100원 보상)" style="background:var(--navy-mid);border:1px solid var(--navy-light);border-radius:8px;padding:10px;color:var(--text);font-family:'Noto Sans KR',sans-serif;font-size:13px;width:100%;height:80px;resize:none;outline:none;"></textarea>
+      <button class="btn btn-gold btn-full" style="margin-top:8px;" onclick="submitDiary()">📝 일지 작성하기 (+100원)</button>
+      <div style="font-size:11px;color:var(--text-dim);margin-top:6px;text-align:center;">주 3회 이상 작성 시 회당 100원 지급 (마스터 확인 후)</div>
+    </div>
+    <div id="diaryList"></div>
+    <div class="empty-state" id="diary-empty" style="display:none;"><div class="emoji">📓</div>아직 일지가 없어요</div>
+  </div>
+
+  <!-- 미션 -->
+  <div id="panel-mission" style="display:none;">
+    <div class="spinner" id="mission-spinner"></div>
+    <div id="missionList"></div>
+    <div class="empty-state" id="mission-empty" style="display:none;"><div class="emoji">🎯</div>등록된 미션이 없어요</div>
   </div>
 
   <!-- 고지서 -->
@@ -150,7 +186,7 @@
 
 <script type="module">
   import { requireLogin, clearSession } from "../auth.js";
-  import { getStudentByName, getTransactions, getNotices, confirmNotice, getFines, getNationConfig } from "../db.js";
+  import { getStudentByName, getTransactions, getNotices, confirmNotice, getFines, getNationConfig, getAllStudents, addDiary, getMyDiaries, getWeekDiaryCount, getMissions, applyMission } from "../db.js";
 
   const session = requireLogin();
   if (!session) throw new Error("로그인 필요");
@@ -180,6 +216,7 @@
     document.getElementById("studentRole").innerHTML = `<span class="badge badge-blue">${student.role}</span>`;
     document.getElementById("balance").textContent = (student.balance || 0).toLocaleString() + "원";
     window._stockKey = student.stockKey || "";
+    updateSavingBar(student.balance || 0);
 
     // 내 랭킹 계산
     const { getAllStudents } = await import("../db.js");
@@ -282,13 +319,16 @@
   window.switchTab = function(tab, btn) {
     document.querySelectorAll(".tab-btn").forEach(t => t.classList.remove("active"));
     btn.classList.add("active");
-    document.getElementById("panel-tx").style.display = "none";
-    document.getElementById("panel-notice").style.display = "none";
-    document.getElementById("panel-fine").style.display = "none";
+    ["tx","notice","fine","diary","mission"].forEach(t => {
+      const el = document.getElementById("panel-" + t);
+      if (el) el.style.display = "none";
+    });
     document.getElementById("panel-" + tab).style.display = "block";
     currentTab = tab;
     if (tab === "notice") loadNotices();
     if (tab === "fine") loadFines();
+    if (tab === "diary") loadDiary();
+    if (tab === "mission") loadMissions();
   };
 
   window.doConfirm = async function(noticeId, btn) {
@@ -302,6 +342,87 @@
       showToast("오류가 발생했어요", true);
       btn.disabled = false;
       btn.textContent = "확인";
+    }
+  };
+
+  // 청약 진행바
+  function updateSavingBar(balance) {
+    const goal = 5000;
+    const pct = Math.min(Math.round(balance / goal * 100), 100);
+    document.getElementById("savingBar").style.display = "block";
+    document.getElementById("savingFill").style.width = pct + "%";
+    document.getElementById("savingText").textContent = `${balance.toLocaleString()} / ${goal.toLocaleString()}원`;
+    if (balance >= goal) {
+      document.getElementById("savingMsg").textContent = "✅ 청약 신청 가능해요!";
+      document.getElementById("savingMsg").style.color = "var(--accent3)";
+    } else {
+      document.getElementById("savingMsg").textContent = `${(goal - balance).toLocaleString()}원 더 모으면 청약 신청 가능!`;
+    }
+  }
+
+  // 시민일지
+  async function loadDiary() {
+    document.getElementById("diary-empty").style.display = "none";
+    const [diaries, weekCount] = await Promise.all([getMyDiaries(name), getWeekDiaryCount(name)]);
+    const rewardReached = weekCount >= 3;
+    document.getElementById("diaryWeekCount").innerHTML =
+      `이번 주 ${weekCount}회 작성 <span style="color:${rewardReached ? "var(--accent3)" : "var(--gold)"};">${rewardReached ? "✅ 보상 조건 달성!" : "(3회 이상 시 보상)"}</span>`;
+    if (diaries.length === 0) {
+      document.getElementById("diary-empty").style.display = "block";
+      return;
+    }
+    document.getElementById("diaryList").innerHTML = diaries.map(d => {
+      const date = d.createdAt?.toDate ? d.createdAt.toDate().toLocaleDateString("ko-KR",{month:"numeric",day:"numeric",weekday:"short"}) : "";
+      return `<div class="tx-item"><div class="tx-icon">📓</div><div class="tx-desc"><div class="title">${d.content}</div><div class="date">${date}</div></div></div>`;
+    }).join("");
+  }
+
+  window.submitDiary = async function() {
+    const content = document.getElementById("diaryContent").value.trim();
+    if (!content) return showToast("내용을 입력해주세요", true);
+    if (content.length < 5) return showToast("5자 이상 작성해주세요", true);
+    const btn = event.target;
+    btn.disabled = true;
+    try {
+      await addDiary(name, content);
+      showToast("📓 일지 작성 완료! 주 3회 달성 시 보상이 지급돼요 😊");
+      document.getElementById("diaryContent").value = "";
+      loadDiary();
+    } catch(e) {
+      showToast("오류: " + e.message, true);
+    } finally { btn.disabled = false; }
+  };
+
+  // 미션
+  async function loadMissions() {
+    document.getElementById("mission-spinner").style.display = "block";
+    const missions = await getMissions();
+    document.getElementById("mission-spinner").style.display = "none";
+    if (missions.length === 0) {
+      document.getElementById("mission-empty").style.display = "block";
+      return;
+    }
+    document.getElementById("missionList").innerHTML = missions.map(m => `
+      <div class="card" style="margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+          <div style="font-size:15px;font-weight:700;">🎯 ${m.title}</div>
+          <div style="font-family:'Gmarket Sans',sans-serif;font-size:16px;color:var(--gold);font-weight:700;">+${(m.reward||0).toLocaleString()}원</div>
+        </div>
+        <div style="font-size:13px;color:var(--text-dim);margin-bottom:10px;">${m.desc}</div>
+        <button class="btn btn-gold btn-sm" onclick="applyForMission('${m.id}','${m.title}',${m.reward})">완료 신청하기</button>
+      </div>`).join("");
+  }
+
+  window.applyForMission = async function(id, title, reward) {
+    const btn = event.target;
+    btn.disabled = true;
+    try {
+      await applyMission(id, name, title);
+      showToast(`🎯 "${title}" 완료 신청 완료! 승인 후 ${reward.toLocaleString()}원 지급돼요`);
+      btn.textContent = "신청됨 ✅";
+    } catch(e) {
+      showToast("오류: " + e.message, true);
+      btn.disabled = false;
     }
   };
 

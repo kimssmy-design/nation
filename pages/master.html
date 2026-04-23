@@ -150,6 +150,8 @@
   <div class="tab-bar" style="overflow-x:auto;">
     <button class="tab-btn active" onclick="switchTab('students', this)">👥 학생 관리</button>
     <button class="tab-btn" onclick="switchTab('notice', this)">📢 공지 관리</button>
+    <button class="tab-btn" onclick="switchTab('mission', this)">🎯 미션 관리</button>
+    <button class="tab-btn" onclick="switchTab('diary', this)">📓 일지 관리</button>
     <button class="tab-btn" onclick="switchTab('report', this)">🚨 신고 관리</button>
     <button class="tab-btn" onclick="switchTab('money', this)">💸 가상화폐</button>
     <button class="tab-btn" onclick="switchTab('setting', this)">⚙️ 국가 설정</button>
@@ -171,6 +173,31 @@
         <tbody id="studentTbody"></tbody>
       </table>
     </div>
+  </div>
+
+  <!-- 미션 관리 -->
+  <div id="panel-mission" style="display:none;">
+    <div class="card" style="margin-bottom:14px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:12px;">🎯 새 미션 등록</div>
+      <div class="input-group"><label>미션 제목</label><input type="text" id="missionTitle" placeholder="예: 교실 청소 돕기"></div>
+      <div class="input-group"><label>미션 설명</label><input type="text" id="missionDesc" placeholder="예: 청소 시간에 자발적으로 참여하기"></div>
+      <div class="input-group"><label>보상 금액 (원)</label>
+        <select id="missionReward">
+          <option value="500">500원</option>
+          <option value="1000" selected>1,000원</option>
+          <option value="2000">2,000원</option>
+          <option value="3000">3,000원</option>
+        </select>
+      </div>
+      <button class="btn btn-gold" onclick="doAddMission()">미션 등록하기</button>
+    </div>
+    <div id="missionManageList"></div>
+  </div>
+
+  <!-- 일지 관리 -->
+  <div id="panel-diary" style="display:none;">
+    <div style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">주 3회 이상 작성한 학생에게 100원씩 지급하세요.</div>
+    <div id="diaryManageList"></div>
   </div>
 
   <!-- 공지 관리 -->
@@ -303,7 +330,8 @@
     changePassword, changeRole, addTransaction,
     getNotices, addNotice,
     getAllReports, updateReport,
-    issueFine
+    issueFine, addMission, getMissions, closeMission,
+    getMyDiaries, getWeekDiaryCount
   } from "../db.js";
 
   const session = requireMaster();
@@ -599,11 +627,79 @@
   window.switchTab = function(tab, btn) {
     document.querySelectorAll(".tab-btn").forEach(t => t.classList.remove("active"));
     btn.classList.add("active");
-    ["students","notice","report","money","setting"].forEach(t => {
-      document.getElementById("panel-" + t).style.display = t === tab ? "block" : "none";
+    ["students","notice","report","money","setting","mission","diary"].forEach(t => {
+      const el = document.getElementById("panel-" + t);
+      if (el) el.style.display = t === tab ? "block" : "none";
     });
     if (tab === "notice") loadNotices();
     if (tab === "report") loadReports();
+    if (tab === "mission") loadMissionManage();
+    if (tab === "diary") loadDiaryManage();
+  };
+
+  // 미션 관리
+  async function loadMissionManage() {
+    const missions = await getMissions();
+    if (missions.length === 0) {
+      document.getElementById("missionManageList").innerHTML = `<div class="empty-state"><div class="emoji">🎯</div>등록된 미션이 없어요</div>`;
+      return;
+    }
+    document.getElementById("missionManageList").innerHTML = missions.map(m => `
+      <div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:12px;">
+        <div>
+          <div style="font-size:14px;font-weight:700;">🎯 ${m.title}</div>
+          <div style="font-size:12px;color:var(--text-dim);">${m.desc} · <span style="color:var(--gold);">+${(m.reward||0).toLocaleString()}원</span></div>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="doCloseMission('${m.id}')">마감</button>
+      </div>`).join("");
+  }
+
+  window.doAddMission = async function() {
+    const title = document.getElementById("missionTitle").value.trim();
+    const desc = document.getElementById("missionDesc").value.trim();
+    const reward = parseInt(document.getElementById("missionReward").value);
+    if (!title || !desc) return showToast("제목과 설명을 입력해주세요", true);
+    await addMission(title, desc, reward, "마스터");
+    showToast("🎯 미션이 등록됐어요!");
+    document.getElementById("missionTitle").value = "";
+    document.getElementById("missionDesc").value = "";
+    loadMissionManage();
+  };
+
+  window.doCloseMission = async function(id) {
+    await closeMission(id);
+    showToast("미션이 마감됐어요");
+    loadMissionManage();
+  };
+
+  // 일지 관리 (주 3회 이상 달성자 확인 + 보상 지급)
+  async function loadDiaryManage() {
+    const students = await getAllStudents();
+    const realStudents = students.filter(s => s.role !== "테스터");
+    let html = "";
+    for (const s of realStudents) {
+      const count = await getWeekDiaryCount(s.name);
+      if (count > 0) {
+        const reached = count >= 3;
+        html += `
+          <div class="card" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:12px;">
+            <div>
+              <div style="font-size:14px;font-weight:700;">${s.name}</div>
+              <div style="font-size:12px;color:${reached ? "var(--accent3)" : "var(--text-dim)"};">이번 주 ${count}회 작성 ${reached ? "✅ 보상 지급 가능" : "(3회 미달)"}</div>
+            </div>
+            ${reached ? `<button class="btn btn-gold btn-sm" onclick="doPayDiary('${s.name}',${count})">💰 ${(count*100).toLocaleString()}원 지급</button>` : ""}
+          </div>`;
+      }
+    }
+    if (!html) html = `<div class="empty-state"><div class="emoji">📓</div>이번 주 작성한 학생이 없어요</div>`;
+    document.getElementById("diaryManageList").innerHTML = html;
+  }
+
+  window.doPayDiary = async function(name, count) {
+    const amount = count * 100;
+    await addTransaction(name, amount, "칭찬쿠폰", `시민일지 보상 (${count}회×100원)`, "마스터");
+    showToast(`✅ ${name}에게 ${amount.toLocaleString()}원 지급 완료!`);
+    loadDiaryManage();
   };
 
   window.doLogout = function() {

@@ -171,3 +171,87 @@ export async function getShopLogs() {
     .map(d => ({ id: d.id, ...d.data() }))
     .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
 }
+
+// ══════════════════════════════
+// 시민일지
+// ══════════════════════════════
+
+export async function addDiary(name, content) {
+  await addDoc(collection(db, "diaries"), {
+    name, content,
+    week: getWeekKey(),
+    createdAt: serverTimestamp(),
+  });
+}
+
+export async function getMyDiaries(name) {
+  const snap = await getDocs(collection(db, "diaries"));
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .filter(d => d.name === name)
+    .sort((a, b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+}
+
+export async function getWeekDiaryCount(name) {
+  const week = getWeekKey();
+  const snap = await getDocs(collection(db, "diaries"));
+  return snap.docs
+    .map(d => d.data())
+    .filter(d => d.name === name && d.week === week).length;
+}
+
+function getWeekKey() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const start = new Date(year, 0, 1);
+  const week = Math.ceil(((now - start) / 86400000 + start.getDay() + 1) / 7);
+  return `${year}-W${week}`;
+}
+
+// ══════════════════════════════
+// 미션
+// ══════════════════════════════
+
+export async function addMission(title, desc, reward, by) {
+  await addDoc(collection(db, "missions"), {
+    title, desc, reward, by,
+    active: true,
+    createdAt: serverTimestamp(),
+  });
+}
+
+export async function getMissions() {
+  const snap = await getDocs(collection(db, "missions"));
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .filter(d => d.active)
+    .sort((a, b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+}
+
+export async function applyMission(missionId, studentName, missionTitle) {
+  await addDoc(collection(db, "missionApps"), {
+    missionId, studentName, missionTitle,
+    status: "신청",
+    createdAt: serverTimestamp(),
+  });
+}
+
+export async function getMissionApps() {
+  const snap = await getDocs(collection(db, "missionApps"));
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+}
+
+export async function approveMission(appId, studentName, reward, by) {
+  await updateDoc(doc(db, "missionApps", appId), { status: "승인" });
+  await addTransaction(studentName, reward, "이벤트", "미션 보상", by);
+}
+
+export async function rejectMission(appId) {
+  await updateDoc(doc(db, "missionApps", appId), { status: "반려" });
+}
+
+export async function closeMission(missionId) {
+  await updateDoc(doc(db, "missions", missionId), { active: false });
+}
