@@ -135,10 +135,10 @@ export async function payFine(fineId, studentName, amount, by) {
 // 매점 판매 로그
 // ══════════════════════════════
 
-// 판매 기록 추가
-export async function addShopLog(buyer, amount, item, by) {
+// 판매 기록 추가 (payType: "앱결제" | "현금")
+export async function addShopLog(buyer, amount, item, by, payType = "앱결제") {
   await addDoc(collection(db, "shopLogs"), {
-    buyer, amount, item, by,
+    buyer, amount, item, by, payType,
     createdAt: serverTimestamp(),
   });
 }

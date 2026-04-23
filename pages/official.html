@@ -431,26 +431,75 @@
   async function renderLog() {
     // 매점지기는 판매 로그 표시
     if (role === "매점지기") {
-      const logs = await getShopLogs();
-      if (logs.length === 0) return `<div class="empty-state"><div class="emoji">🛒</div>판매 기록이 없어요</div>`;
-      const total = logs.reduce((s, l) => s + (l.amount || 0), 0);
+      let logs = [];
+      try {
+        logs = await getShopLogs();
+      } catch(e) {
+        // 인덱스 없을 때 fallback: 정렬 없이 가져오기
+        console.warn("shopLogs 인덱스 없음, fallback 사용:", e);
+        const { getDocs, collection } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+        const { db } = await import("../firebase.js");
+        const snap = await getDocs(collection(db, "shopLogs"));
+        logs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      }
+
+      const appTotal = logs.filter(l => l.payType !== "현금").reduce((s, l) => s + (l.amount || 0), 0);
+      const cashTotal = logs.filter(l => l.payType === "현금").reduce((s, l) => s + (l.amount || 0), 0);
+      const total = appTotal + cashTotal;
+
+      const logHtml = logs.length === 0
+        ? `<div class="empty-state"><div class="emoji">🛒</div>판매 기록이 없어요</div>`
+        : `<div class="tx-list">${logs.map(l => {
+            const date = l.createdAt?.toDate ? l.createdAt.toDate().toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}) : "";
+            const isCash = l.payType === "현금";
+            return `
+              <div class="tx-item">
+                <div class="tx-icon">${isCash ? "💵" : "💳"}</div>
+                <div class="tx-desc">
+                  <div class="title">${l.buyer} · ${l.item} <span style="font-size:11px;color:${isCash ? "var(--accent3)" : "var(--accent)"};">[${isCash ? "현금" : "앱결제"}]</span></div>
+                  <div class="date">${date}</div>
+                </div>
+                <div class="tx-amount minus">-${(l.amount||0).toLocaleString()}원</div>
+              </div>`;
+          }).join("")}</div>`;
+
       return `
-        <div class="card" style="margin-bottom:12px;text-align:center;">
-          <div style="font-size:12px;color:var(--text-dim);margin-bottom:4px;">이번 주 총 매출</div>
-          <div style="font-family:'Gmarket Sans',sans-serif;font-size:24px;font-weight:700;color:var(--gold);">${total.toLocaleString()}원</div>
+        <div class="card" style="margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-around;text-align:center;">
+            <div>
+              <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;">총 매출</div>
+              <div style="font-family:'Gmarket Sans',sans-serif;font-size:22px;font-weight:700;color:var(--gold);">${total.toLocaleString()}원</div>
+            </div>
+            <div>
+              <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;">💳 앱결제</div>
+              <div style="font-family:'Gmarket Sans',sans-serif;font-size:18px;font-weight:700;color:var(--accent);">${appTotal.toLocaleString()}원</div>
+            </div>
+            <div>
+              <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;">💵 현금</div>
+              <div style="font-family:'Gmarket Sans',sans-serif;font-size:18px;font-weight:700;color:var(--accent3);">${cashTotal.toLocaleString()}원</div>
+            </div>
+          </div>
         </div>
-        <div class="tx-list">${logs.map(l => {
-          const date = l.createdAt?.toDate ? l.createdAt.toDate().toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}) : "";
-          return `
-            <div class="tx-item">
-              <div class="tx-icon">🛒</div>
-              <div class="tx-desc">
-                <div class="title">${l.buyer} · ${l.item}</div>
-                <div class="date">${date}</div>
-              </div>
-              <div class="tx-amount minus">-${(l.amount||0).toLocaleString()}원</div>
-            </div>`;
-        }).join("")}</div>`;
+        <div class="card" style="margin-bottom:12px;">
+          <div style="font-size:13px;font-weight:700;margin-bottom:10px;">💵 현금 판매 직접 입력</div>
+          <div class="input-group"><label>구매 학생</label>
+            <input type="text" id="cash-buyer" placeholder="학생 이름 입력">
+          </div>
+          <div class="input-group"><label>금액</label>
+            <select id="cash-amount">
+              <option value="500">500원</option>
+              <option value="1000">1,000원</option>
+              <option value="1500">1,500원</option>
+              <option value="2000">2,000원</option>
+            </select>
+          </div>
+          <div class="input-group"><label>품목</label>
+            <input type="text" id="cash-item" placeholder="예: 새우깡">
+          </div>
+          <button class="btn btn-gold btn-full" id="cash-sell-btn">💵 현금 판매 기록하기</button>
+        </div>
+        ${logHtml}`;
     }
     // 다른 공직자는 본인 거래내역
     const txs = await getTransactions(name);
@@ -542,6 +591,20 @@
       showToast(`✅ ${buyer} ${amount.toLocaleString()}원 차감 완료!`);
       document.getElementById("shop-buyer").value = "";
       document.getElementById("shop-item").value = "";
+    };
+
+    // 현금 판매 기록
+    const cashSellBtn = document.getElementById("cash-sell-btn");
+    if (cashSellBtn) cashSellBtn.onclick = async () => {
+      const buyer = document.getElementById("cash-buyer").value.trim();
+      const amount = parseInt(document.getElementById("cash-amount").value);
+      const item = document.getElementById("cash-item").value.trim() || "매점 구매";
+      if (!buyer) return showToast("구매 학생 이름을 입력해주세요", true);
+      await addShopLog(buyer, amount, item, name, "현금");
+      showToast(`✅ 현금 판매 기록 완료! (${buyer} ${amount.toLocaleString()}원)`);
+      document.getElementById("cash-buyer").value = "";
+      document.getElementById("cash-item").value = "";
+      renderPanel("log");
     };
 
     // 공지 등록
