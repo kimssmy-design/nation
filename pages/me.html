@@ -96,7 +96,7 @@
       <div class="label">보유 가상화폐</div>
       <div id="myRank" style="font-size:11px;color:var(--text-dim);margin-top:2px;"></div>
     </div>
-    <button onclick="refreshAll()" style="background:transparent;border:none;cursor:pointer;font-size:20px;padding:4px;" title="새로고침">🔄</button>
+    <button id="refreshBtn" style="background:transparent;border:none;cursor:pointer;font-size:20px;padding:4px;" title="새로고침">🔄</button>
   </div>
 
   <!-- 청약 진행바 -->
@@ -113,11 +113,11 @@
 
   <!-- 탭 -->
   <div class="tab-bar" style="overflow-x:auto;">
-    <button class="tab-btn active" onclick="switchTab('tx', this)">💸 거래</button>
-    <button class="tab-btn" onclick="switchTab('notice', this)">📢 공지</button>
-    <button class="tab-btn" onclick="switchTab('diary', this)">📓 일지</button>
-    <button class="tab-btn" onclick="switchTab('mission', this)">🎯 미션</button>
-    <button class="tab-btn" onclick="switchTab('fine', this)">📄 고지서</button>
+    <button class="tab-btn active" data-tab="tx">💸 거래</button>
+    <button class="tab-btn" data-tab="notice">📢 공지</button>
+    <button class="tab-btn" data-tab="diary">📓 일지</button>
+    <button class="tab-btn" data-tab="mission">🎯 미션</button>
+    <button class="tab-btn" data-tab="fine">📄 고지서</button>
   </div>
 
   <!-- 거래내역 -->
@@ -316,20 +316,27 @@
     }).join("");
   }
 
-  window.switchTab = function(tab, btn) {
-    document.querySelectorAll(".tab-btn").forEach(t => t.classList.remove("active"));
-    btn.classList.add("active");
-    ["tx","notice","fine","diary","mission"].forEach(t => {
-      const el = document.getElementById("panel-" + t);
-      if (el) el.style.display = "none";
+  // 탭 이벤트 리스너
+  document.querySelectorAll(".tab-btn[data-tab]").forEach(btn => {
+    btn.addEventListener("click", function() {
+      const tab = this.dataset.tab;
+      document.querySelectorAll(".tab-btn").forEach(t => t.classList.remove("active"));
+      this.classList.add("active");
+      ["tx","notice","fine","diary","mission"].forEach(t => {
+        const el = document.getElementById("panel-" + t);
+        if (el) el.style.display = "none";
+      });
+      document.getElementById("panel-" + tab).style.display = "block";
+      currentTab = tab;
+      if (tab === "notice") loadNotices();
+      if (tab === "fine") loadFines();
+      if (tab === "diary") loadDiary();
+      if (tab === "mission") loadMissions();
     });
-    document.getElementById("panel-" + tab).style.display = "block";
-    currentTab = tab;
-    if (tab === "notice") loadNotices();
-    if (tab === "fine") loadFines();
-    if (tab === "diary") loadDiary();
-    if (tab === "mission") loadMissions();
-  };
+  });
+
+  // 새로고침 버튼
+  document.getElementById("refreshBtn").addEventListener("click", refreshAll);
 
   window.doConfirm = async function(noticeId, btn) {
     btn.disabled = true;
