@@ -362,7 +362,7 @@
     document.getElementById("amountGrid").innerHTML = AMOUNTS.map(a => {
       const insufficient = (student.balance || 0) < a.value;
       return `
-        <div class="amount-btn ${insufficient ? "disabled" : ""}" onclick="selectAmount(${a.value}, this)">
+        <div class="amount-btn ${insufficient ? "disabled" : ""}" ${insufficient ? "" : `onclick="selectAmount(${a.value}, this)"`}>
           <div class="price">${a.label}</div>
           <div class="price-label">${insufficient ? "잔고 부족" : "탭하여 선택"}</div>
         </div>`;
@@ -390,12 +390,14 @@
   window.doPayment = async function() {
     document.getElementById("confirmOverlay").style.display = "none";
 
-    const balance = currentStudent.balance || 0;
+    // 최신 잔고 Firebase에서 재조회
+    const freshStudent = await getStudentByName(currentStudent.name);
+    const balance = freshStudent?.balance || 0;
 
     // 잔고 부족 재확인
     if (balance < selectedAmount) {
-      document.getElementById("failDesc").textContent =
-        `현재 잔고: ${balance.toLocaleString()}원\n결제 금액: ${selectedAmount.toLocaleString()}원`;
+      document.getElementById("failDesc").innerHTML =
+        `현재 잔고: <strong>${balance.toLocaleString()}원</strong><br>결제 금액: <strong>${selectedAmount.toLocaleString()}원</strong><br><br>잔고가 부족해요!`;
       document.getElementById("failOverlay").style.display = "flex";
       return;
     }
