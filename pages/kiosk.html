@@ -429,11 +429,29 @@ body {
         }).join("");
       }
 
+      // 최근 거래에서 이벤트 속보 생성
+      const { getDocs, collection } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+      const { db } = await import("../firebase.js");
+      const txSnap = await getDocs(collection(db, "transactions"));
+      const recentTxs = txSnap.docs
+        .map(d => d.data())
+        .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0))
+        .slice(0, 20);
+
+      const newsItems = recentTxs
+        .filter(tx => ["이벤트","칭찬쿠폰","주급","로또"].includes(tx.type))
+        .slice(0, 5)
+        .map(tx => {
+          const icon = tx.type === "이벤트" ? "🎉" : tx.type === "칭찬쿠폰" ? "🌟" : tx.type === "주급" ? "💰" : "🎟️";
+          return `${icon} ${tx.name} +${(tx.amount||0).toLocaleString()}원 (${tx.memo||tx.type})`;
+        });
+
       // 티커
       const top1 = sorted[0];
       const tickerParts = [
         top1 ? `🏆 자산 1위: ${top1.name} (${(top1.balance||0).toLocaleString()}원)` : "",
-        `👥 참여 국민: ${students.length}명`,
+        ...newsItems,
+        `👥 참여 국민: ${realStudents.length}명`,
         `💰 총 통화량: ${total.toLocaleString()}원`,
         shopOpen ? "🟢 매점 지금 영업중입니다!" : "🔒 매점은 수요일 종례 후 오픈합니다",
         notices[0] ? `📢 최신 공지: ${notices[0].title}` : "",

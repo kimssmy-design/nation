@@ -74,6 +74,7 @@
 }
 .fine-item.paid .fine-amount { color: var(--accent3); }
 .fine-desc { font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+@keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
@@ -93,7 +94,9 @@
     <div class="me-balance">
       <div class="amount" id="balance">-</div>
       <div class="label">보유 가상화폐</div>
+      <div id="myRank" style="font-size:11px;color:var(--text-dim);margin-top:2px;"></div>
     </div>
+    <button onclick="refreshAll()" style="background:transparent;border:none;cursor:pointer;font-size:20px;padding:4px;" title="새로고침">🔄</button>
   </div>
 
   <!-- 탭 -->
@@ -155,6 +158,14 @@
   const { name } = session;
   let currentTab = "tx";
 
+  async function refreshAll() {
+    const btn = document.querySelector('[onclick="refreshAll()"]');
+    if (btn) btn.style.animation = "spin 0.5s linear";
+    await init();
+    if (btn) btn.style.animation = "";
+    showToast("✅ 새로고침 완료!");
+  }
+
   async function init() {
     // 국가 이름
     const config = await getNationConfig();
@@ -169,6 +180,16 @@
     document.getElementById("studentRole").innerHTML = `<span class="badge badge-blue">${student.role}</span>`;
     document.getElementById("balance").textContent = (student.balance || 0).toLocaleString() + "원";
     window._stockKey = student.stockKey || "";
+
+    // 내 랭킹 계산
+    const { getAllStudents } = await import("../db.js");
+    const allSt = await getAllStudents();
+    const realSt = allSt.filter(s => s.role !== "테스터").sort((a,b) => (b.balance||0) - (a.balance||0));
+    const myRank = realSt.findIndex(s => s.name === name) + 1;
+    if (myRank > 0) {
+      const medal = myRank === 1 ? "🥇" : myRank === 2 ? "🥈" : myRank === 3 ? "🥉" : "";
+      document.getElementById("myRank").textContent = `${medal} 자산 ${myRank}위 / ${realSt.length}명`;
+    }
 
     loadTx();
   }
