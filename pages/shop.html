@@ -284,7 +284,7 @@
 
 <script type="module">
   import { getNationConfig, getAllStudents, getStudentByName, addTransaction, addShopLog } from "../db.js";
-  import { getSession, hashPassword } from "../auth.js";
+  import { getSession, hashPassword, clearSession } from "../auth.js";
 
   // 결제 금액 목록 (나중에 추가 가능)
   const AMOUNTS = [
@@ -313,15 +313,20 @@
       return;
     }
 
-    // 이미 로그인 상태면 바로 STEP2로
+    // 이미 로그인 상태면 이름만 자동 선택 (비번은 항상 입력)
     const session = getSession();
     if (session && session.name) {
-      const student = await getStudentByName(session.name);
-      if (student) {
-        currentStudent = student;
-        showAmountPanel();
-        return;
-      }
+      selectedName = session.name;
+      document.getElementById("selectedNameInput").value = session.name;
+      document.getElementById("shopPw").focus();
+      // 이름 칩 선택 표시
+      await loadNames();
+      document.querySelectorAll(".name-chip").forEach(chip => {
+        if (chip.textContent.trim() === session.name) {
+          chip.classList.add("selected");
+        }
+      });
+      return;
     }
 
     loadNames();
@@ -444,6 +449,8 @@
         if (count < 0) {
           clearInterval(countdown);
           document.getElementById("doneOverlay").style.display = "none";
+          // 매점 태블릿에서 다음 학생을 위해 세션 초기화
+          clearSession();
           resetShop();
         }
       }, 1000);

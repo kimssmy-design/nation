@@ -3,7 +3,8 @@
 import { db } from "./firebase.js";
 import {
   doc, getDoc, setDoc, updateDoc, addDoc,
-  collection, query, where, getDocs, orderBy, serverTimestamp
+  collection, query, where, getDocs, orderBy, serverTimestamp,
+  runTransaction, increment
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // 국가 설정
@@ -64,14 +65,23 @@ export async function changeRole(name, role) {
   await updateDoc(doc(db, "students", name), { role });
 }
 
-// 거래
+// 거래 (원자적 트랜잭션 — 동시 접근 시 잔액 오류 방지)
 export async function addTransaction(name, amount, type, memo, by) {
+  const studentRef = doc(db, "students", name);
+
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(studentRef);
+    if (!snap.exists()) throw new Error("학생을 찾을 수 없어요");
+    const currentBalance = snap.data().balance || 0;
+    const newBalance = currentBalance + amount;
+    if (newBalance < 0) throw new Error("잔고가 부족해요");
+    tx.update(studentRef, { balance: newBalance });
+  });
+
+  // 거래 기록은 트랜잭션 밖에서 (실패해도 잔액은 이미 반영됨)
   await addDoc(collection(db, "transactions"), {
     name, amount, type, memo, by, createdAt: serverTimestamp(),
   });
-  const student = await getStudentByName(name);
-  if (!student) throw new Error("학생을 찾을 수 없어요");
-  await updateDoc(doc(db, "students", name), { balance: (student.balance || 0) + amount });
 }
 export async function getTransactions(name) {
   const q = query(
