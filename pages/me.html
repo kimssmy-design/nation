@@ -416,22 +416,26 @@
           <div style="font-family:'Gmarket Sans',sans-serif;font-size:16px;color:var(--gold);font-weight:700;">+${(m.reward||0).toLocaleString()}원</div>
         </div>
         <div style="font-size:13px;color:var(--text-dim);margin-bottom:10px;">${m.desc}</div>
-        <button class="btn btn-gold btn-sm" onclick="applyForMission('${m.id}','${m.title}',${m.reward})">완료 신청하기</button>
+        <button class="btn btn-gold btn-sm mission-apply-btn" data-id="${m.id}" data-title="${m.title}" data-reward="${m.reward||0}">완료 신청하기</button>
       </div>`).join("");
+
+    // 미션 신청 버튼 이벤트
+    document.querySelectorAll(".mission-apply-btn").forEach(btn => {
+      btn.addEventListener("click", async function() {
+        this.disabled = true;
+        try {
+          await applyMission(this.dataset.id, name, this.dataset.title);
+          showToast(`🎯 "${this.dataset.title}" 신청 완료! 승인 후 ${parseInt(this.dataset.reward).toLocaleString()}원 지급돼요`);
+          this.textContent = "신청됨 ✅";
+        } catch(e) {
+          showToast("오류: " + e.message, true);
+          this.disabled = false;
+        }
+      });
+    });
   }
 
-  window.applyForMission = async function(id, title, reward) {
-    const btn = event.target;
-    btn.disabled = true;
-    try {
-      await applyMission(id, name, title);
-      showToast(`🎯 "${title}" 완료 신청 완료! 승인 후 ${reward.toLocaleString()}원 지급돼요`);
-      btn.textContent = "신청됨 ✅";
-    } catch(e) {
-      showToast("오류: " + e.message, true);
-      btn.disabled = false;
-    }
-  };
+
 
   window.doLogout = function() {
     clearSession();
