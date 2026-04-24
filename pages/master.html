@@ -152,6 +152,7 @@
     <button class="tab-btn" onclick="switchTab('notice', this)">📢 공지 관리</button>
     <button class="tab-btn" onclick="switchTab('mission', this)">🎯 미션 관리</button>
     <button class="tab-btn" onclick="switchTab('diary', this)">📓 일지 관리</button>
+    <button class="tab-btn" onclick="switchTab('tax', this)">💼 세금 미납</button>
     <button class="tab-btn" onclick="switchTab('report', this)">🚨 신고 관리</button>
     <button class="tab-btn" onclick="switchTab('money', this)">💸 가상화폐</button>
     <button class="tab-btn" onclick="switchTab('setting', this)">⚙️ 국가 설정</button>
@@ -210,6 +211,12 @@
     </div>
     <div class="spinner" id="notice-spinner"></div>
     <div id="noticeStatList"></div>
+  </div>
+
+  <!-- 세금 미납 현황 -->
+  <div id="panel-tax" style="display:none;">
+    <div class="spinner" id="tax-spinner"></div>
+    <div id="taxFineList"></div>
   </div>
 
   <!-- 신고 관리 -->
@@ -330,7 +337,7 @@
     changePassword, changeRole, addTransaction,
     getNotices, addNotice,
     getAllReports, updateReport,
-    issueFine, addMission, getMissions, closeMission,
+    issueFine, getFines, payFine, addMission, getMissions, closeMission,
     getMyDiaries, getWeekDiaryCount
   } from "../db.js";
 
@@ -627,7 +634,7 @@
   window.switchTab = function(tab, btn) {
     document.querySelectorAll(".tab-btn").forEach(t => t.classList.remove("active"));
     btn.classList.add("active");
-    ["students","notice","report","money","setting","mission","diary"].forEach(t => {
+    ["students","notice","report","money","setting","mission","diary","tax"].forEach(t => {
       const el = document.getElementById("panel-" + t);
       if (el) el.style.display = t === tab ? "block" : "none";
     });
@@ -635,6 +642,67 @@
     if (tab === "report") loadReports();
     if (tab === "mission") loadMissionManage();
     if (tab === "diary") loadDiaryManage();
+    if (tab === "tax") loadTaxFines();
+  };
+
+  // 세금 미납 현황
+  async function loadTaxFines() {
+    document.getElementById("tax-spinner").style.display = "block";
+    const students = await getAllStudents();
+    const realStudents = students.filter(s => s.role !== "테스터");
+    let html = "";
+    let totalUnpaid = 0;
+
+    for (const s of realStudents) {
+      const fines = await getFines(s.name);
+      const taxFines = fines.filter(f => !f.paid && f.reason === "세금 미납");
+      if (taxFines.length > 0) {
+        taxFines.forEach(f => {
+          totalUnpaid += f.amount;
+          const date = f.createdAt?.toDate ? f.createdAt.toDate().toLocaleDateString("ko-KR",{month:"numeric",day:"numeric"}) : "";
+          html += `
+            <div class="card" style="margin-bottom:8px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                <div style="font-weight:700;">${s.name} <span class="badge badge-blue" style="font-size:10px;">${s.role}</span></div>
+                <div style="font-family:'Gmarket Sans';color:var(--accent2);font-size:16px;font-weight:700;">${f.amount.toLocaleString()}원</div>
+              </div>
+              <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;">발행일: ${date} · 사유: ${f.reason}</div>
+              <div style="display:flex;gap:8px;">
+                <button class="btn btn-gold btn-sm" onclick="doPayTaxFine('${f.id}','${s.name}',${f.amount})">납부 처리</button>
+                <button class="btn btn-outline btn-sm" onclick="doForgiveTax('${f.id}')">탕감</button>
+              </div>
+            </div>`;
+        });
+      }
+    }
+
+    document.getElementById("tax-spinner").style.display = "none";
+
+    if (!html) {
+      document.getElementById("taxFineList").innerHTML = `<div class="empty-state"><div class="emoji">✅</div>세금 미납자가 없어요!</div>`;
+      return;
+    }
+
+    document.getElementById("taxFineList").innerHTML = `
+      <div class="card" style="margin-bottom:12px;text-align:center;">
+        <div style="font-size:12px;color:var(--text-dim);margin-bottom:4px;">총 미납 세금</div>
+        <div style="font-family:'Gmarket Sans';font-size:24px;font-weight:700;color:var(--accent2);">${totalUnpaid.toLocaleString()}원</div>
+      </div>
+      ${html}`;
+  }
+
+  window.doPayTaxFine = async function(fineId, studentName, amount) {
+    await payFine(fineId, studentName, amount, "마스터");
+    showToast(`✅ ${studentName} 세금 납부 처리 완료!`);
+    loadTaxFines();
+  };
+
+  window.doForgiveTax = async function(fineId) {
+    const { updateDoc, doc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    const { db } = await import("../firebase.js");
+    await updateDoc(doc(db, "fines", fineId), { paid: true, reason: "세금 탕감" });
+    showToast("세금이 탕감됐어요");
+    loadTaxFines();
   };
 
   // 미션 관리
