@@ -320,20 +320,15 @@
       return;
     }
 
-    // 이미 로그인 상태면 이름만 자동 선택 (비번은 항상 입력)
+    // 이미 로그인 상태면 바로 결제 화면으로
     const session = getSession();
     if (session && session.name) {
-      selectedName = session.name;
-      document.getElementById("selectedNameInput").value = session.name;
-      document.getElementById("shopPw").focus();
-      // 이름 칩 선택 표시
-      await loadNames();
-      document.querySelectorAll(".name-chip").forEach(chip => {
-        if (chip.textContent.trim() === session.name) {
-          chip.classList.add("selected");
-        }
-      });
-      return;
+      const student = await getStudentByName(session.name);
+      if (student) {
+        currentStudent = student;
+        showAmountPanel();
+        return;
+      }
     }
 
     loadNames();
