@@ -229,11 +229,7 @@
           <div id="dot3" style="width:16px;height:16px;border-radius:50%;background:var(--navy-light);border:2px solid var(--navy-light);transition:all 0.2s;"></div>
         </div>
         <input type="hidden" id="shopPw">
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:4px;">
-          ${[1,2,3,4,5,6,7,8,9,'',0,'⌫'].map(n => `
-            <button onclick="padInput('${n}')" style="background:var(--navy-mid);border:1px solid var(--navy-light);border-radius:10px;padding:14px;font-size:20px;font-weight:700;color:var(--text);cursor:pointer;font-family:'Gmarket Sans',sans-serif;transition:all 0.15s;" ${n===''?'disabled style="background:transparent;border:transparent;"':''}>${n}</button>
-          `).join('')}
-        </div>
+        <div id="keypad" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:4px;"></div>
       </div>
     </div>
   </div>
@@ -309,6 +305,7 @@
   let selectedAmount = 0;
 
   async function init() {
+    buildKeypad();
     const config = await getNationConfig();
     if (config?.name) document.getElementById("nationName").textContent = config.name;
 
@@ -383,6 +380,25 @@
           <div class="price-label">${insufficient ? "잔고 부족 🚫" : "탭하여 선택"}</div>
         </div>`;
     }).join("");
+  }
+
+  // 키패드 버튼 동적 생성
+  function buildKeypad() {
+    const keypad = document.getElementById("keypad");
+    const keys = [1,2,3,4,5,6,7,8,9,'',0,'⌫'];
+    keys.forEach(n => {
+      const btn = document.createElement('button');
+      btn.textContent = n;
+      btn.style.cssText = "background:var(--navy-mid);border:1px solid var(--navy-light);border-radius:10px;padding:14px;font-size:20px;font-weight:700;color:var(--text);cursor:pointer;font-family:'Gmarket Sans',sans-serif;transition:all 0.15s;";
+      if (n === '') {
+        btn.disabled = true;
+        btn.style.background = 'transparent';
+        btn.style.border = 'transparent';
+      } else {
+        btn.addEventListener('click', () => padInput(String(n)));
+      }
+      keypad.appendChild(btn);
+    });
   }
 
   let padValue = "";
