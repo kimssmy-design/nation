@@ -118,6 +118,7 @@
     <button class="tab-btn" data-tab="diary">📓 일지</button>
     <button class="tab-btn" data-tab="mission">🎯 미션</button>
     <button class="tab-btn" data-tab="fine">📄 고지서</button>
+    <button class="tab-btn" data-tab="board">🗒️ 의견판</button>
   </div>
 
   <!-- 거래내역 -->
@@ -171,6 +172,28 @@
       미납 고지서가 없어요
     </div>
   </div>
+
+  <!-- 자유게시판 (포스트잇 보드) -->
+  <div id="panel-board" style="display:none;">
+    <!-- 작성 폼 -->
+    <div class="card" style="margin-bottom:16px;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:10px;">✏️ 의견 붙이기</div>
+      <textarea id="boardInput" maxlength="100"
+        placeholder="자유롭게 의견을 써보세요! (최대 100자)"
+        style="background:var(--navy-mid);border:1px solid var(--navy-light);border-radius:8px;padding:10px;color:var(--text);font-family:'Noto Sans KR',sans-serif;font-size:13px;width:100%;height:72px;resize:none;outline:none;box-sizing:border-box;"></textarea>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+        <span id="boardCharCount" style="font-size:11px;color:var(--text-dim);">0 / 100</span>
+        <button class="btn btn-gold" onclick="submitBoard()" style="padding:8px 20px;font-size:13px;">🗒️ 붙이기</button>
+      </div>
+    </div>
+    <!-- 보드 -->
+    <div class="spinner" id="board-spinner"></div>
+    <div id="boardGrid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;"></div>
+    <div class="empty-state" id="board-empty" style="display:none;">
+      <div class="emoji">🗒️</div>
+      아직 붙여진 의견이 없어요
+    </div>
+  </div>
 </div>
 
 <!-- 하단 네비 -->
@@ -186,7 +209,7 @@
 
 <script type="module">
   import { requireLogin, clearSession } from "../auth.js";
-  import { getStudentByName, getTransactions, getNotices, confirmNotice, getFines, getNationConfig, getAllStudents, addDiary, getMyDiaries, getWeekDiaryCount, getMissions, applyMission } from "../db.js";
+  import { getStudentByName, getTransactions, getNotices, confirmNotice, getFines, getNationConfig, getAllStudents, addDiary, getMyDiaries, getWeekDiaryCount, getMissions, applyMission, addBoardPost, getBoardPosts } from "../db.js";
 
   const session = requireLogin();
   if (!session) throw new Error("로그인 필요");
@@ -322,7 +345,7 @@
       const tab = this.dataset.tab;
       document.querySelectorAll(".tab-btn").forEach(t => t.classList.remove("active"));
       this.classList.add("active");
-      ["tx","notice","fine","diary","mission"].forEach(t => {
+      ["tx","notice","fine","diary","mission","board"].forEach(t => {
         const el = document.getElementById("panel-" + t);
         if (el) el.style.display = "none";
       });
@@ -332,6 +355,7 @@
       if (tab === "fine") loadFines();
       if (tab === "diary") loadDiary();
       if (tab === "mission") loadMissions();
+      if (tab === "board") loadBoard();
     });
   });
 
@@ -458,6 +482,54 @@
   }
 
   init();
+
+  // ── 자유게시판 ──────────────────────────
+  const BOARD_COLORS = ["#fff9c4","#b2f5ea","#fce4ec","#e8d5ff","#ffe0b2"];
+
+  document.getElementById("boardInput").addEventListener("input", function() {
+    document.getElementById("boardCharCount").textContent = this.value.length + " / 100";
+  });
+
+  async function loadBoard() {
+    document.getElementById("board-spinner").style.display = "block";
+    document.getElementById("board-empty").style.display = "none";
+    document.getElementById("boardGrid").innerHTML = "";
+    const posts = await getBoardPosts();
+    document.getElementById("board-spinner").style.display = "none";
+    if (!posts.length) {
+      document.getElementById("board-empty").style.display = "flex";
+      return;
+    }
+    document.getElementById("boardGrid").innerHTML = posts.map(p => {
+      const date = p.createdAt?.seconds
+        ? new Date(p.createdAt.seconds * 1000).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })
+        : "";
+      return `<div style="background:${p.color};border-radius:4px 4px 4px 4px;padding:14px 12px 10px;min-height:90px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:2px 4px 10px rgba(0,0,0,0.25);position:relative;font-family:'Noto Sans KR',sans-serif;">
+        <div style="font-size:13px;color:#222;line-height:1.55;word-break:break-all;white-space:pre-wrap;">${escapeHtml(p.content)}</div>
+        <div style="font-size:10px;color:#888;margin-top:8px;text-align:right;">${date}</div>
+      </div>`;
+    }).join("");
+  }
+
+  window.submitBoard = async function() {
+    const input = document.getElementById("boardInput");
+    const content = input.value.trim();
+    if (!content) return showToast("내용을 입력해주세요", true);
+    const color = BOARD_COLORS[Math.floor(Math.random() * BOARD_COLORS.length)];
+    try {
+      await addBoardPost(content, color);
+      input.value = "";
+      document.getElementById("boardCharCount").textContent = "0 / 100";
+      showToast("🗒️ 의견이 붙여졌어요!");
+      loadBoard();
+    } catch(e) {
+      showToast("오류가 발생했어요", true);
+    }
+  };
+
+  function escapeHtml(str) {
+    return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
 </script>
 </body>
 </html>

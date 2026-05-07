@@ -2,7 +2,7 @@
 
 import { db } from "./firebase.js";
 import {
-  doc, getDoc, setDoc, updateDoc, addDoc,
+  doc, getDoc, setDoc, updateDoc, addDoc, deleteDoc,
   collection, query, where, getDocs, orderBy, serverTimestamp,
   runTransaction, increment
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -254,4 +254,26 @@ export async function rejectMission(appId) {
 
 export async function closeMission(missionId) {
   await updateDoc(doc(db, "missions", missionId), { active: false });
+}
+
+// ══════════════════════════════
+// 자유게시판 (포스트잇 보드)
+// ══════════════════════════════
+
+export async function addBoardPost(content, color) {
+  await addDoc(collection(db, "board"), {
+    content, color,
+    createdAt: serverTimestamp(),
+  });
+}
+
+export async function getBoardPosts() {
+  const snap = await getDocs(collection(db, "board"));
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+}
+
+export async function deleteBoardPost(postId) {
+  await deleteDoc(doc(db, "board", postId));
 }

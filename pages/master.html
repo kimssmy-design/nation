@@ -156,6 +156,7 @@
     <button class="tab-btn" onclick="switchTab('report', this)">🚨 신고 관리</button>
     <button class="tab-btn" onclick="switchTab('money', this)">💸 가상화폐</button>
     <button class="tab-btn" onclick="switchTab('setting', this)">⚙️ 국가 설정</button>
+    <button class="tab-btn" onclick="switchTab('board', this)">🗒️ 의견판</button>
   </div>
 
   <!-- 학생 관리 -->
@@ -328,6 +329,20 @@
   </div>
 </div>
 
+<!-- 의견판 관리 패널 (master-wrap 바깥이지만 switchTab으로 show/hide) -->
+<div id="panel-board" style="display:none;max-width:860px;margin:0 auto;padding:0 16px 80px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+    <div style="font-size:14px;font-weight:700;">🗒️ 학생 의견 포스트잇</div>
+    <button class="btn btn-outline btn-sm" onclick="loadBoardManage()">🔄 새로고침</button>
+  </div>
+  <div class="spinner" id="board-manage-spinner"></div>
+  <div id="boardManageGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;"></div>
+  <div class="empty-state" id="board-manage-empty" style="display:none;">
+    <div class="emoji">🗒️</div>
+    아직 붙여진 의견이 없어요
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script type="module">
@@ -338,7 +353,8 @@
     getNotices, addNotice,
     getAllReports, updateReport,
     issueFine, getFines, payFine, addMission, getMissions, closeMission,
-    getMyDiaries, getWeekDiaryCount
+    getMyDiaries, getWeekDiaryCount,
+    getBoardPosts, deleteBoardPost
   } from "../db.js";
 
   const session = requireMaster();
@@ -634,7 +650,7 @@
   window.switchTab = function(tab, btn) {
     document.querySelectorAll(".tab-btn").forEach(t => t.classList.remove("active"));
     btn.classList.add("active");
-    ["students","notice","report","money","setting","mission","diary","tax"].forEach(t => {
+    ["students","notice","report","money","setting","mission","diary","tax","board"].forEach(t => {
       const el = document.getElementById("panel-" + t);
       if (el) el.style.display = t === tab ? "block" : "none";
     });
@@ -643,6 +659,7 @@
     if (tab === "mission") loadMissionManage();
     if (tab === "diary") loadDiaryManage();
     if (tab === "tax") loadTaxFines();
+    if (tab === "board") loadBoardManage();
   };
 
   // 세금 미납 현황
@@ -783,6 +800,43 @@
   }
 
   init();
+
+  // ── 의견판 관리 ──────────────────────────
+  async function loadBoardManage() {
+    document.getElementById("board-manage-spinner").style.display = "block";
+    document.getElementById("board-manage-empty").style.display = "none";
+    document.getElementById("boardManageGrid").innerHTML = "";
+    const posts = await getBoardPosts();
+    document.getElementById("board-manage-spinner").style.display = "none";
+    if (!posts.length) {
+      document.getElementById("board-manage-empty").style.display = "flex";
+      return;
+    }
+    document.getElementById("boardManageGrid").innerHTML = posts.map(p => {
+      const date = p.createdAt?.seconds
+        ? new Date(p.createdAt.seconds * 1000).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })
+        : "";
+      const safeContent = p.content.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+      return `<div style="background:${p.color};border-radius:4px;padding:14px 12px 10px;min-height:90px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:2px 4px 10px rgba(0,0,0,0.25);position:relative;font-family:'Noto Sans KR',sans-serif;">
+        <div style="font-size:13px;color:#222;line-height:1.55;word-break:break-all;white-space:pre-wrap;">${safeContent}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+          <span style="font-size:10px;color:#888;">${date}</span>
+          <button onclick="deleteBoardItem('${p.id}')" style="background:rgba(0,0,0,0.12);border:none;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;color:#555;">🗑️ 삭제</button>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  window.deleteBoardItem = async function(postId) {
+    if (!confirm("이 포스트잇을 삭제할까요?")) return;
+    try {
+      await deleteBoardPost(postId);
+      showToast("🗑️ 삭제됐어요");
+      loadBoardManage();
+    } catch(e) {
+      showToast("삭제 오류: " + e.message, true);
+    }
+  };
 </script>
 </body>
 </html>
