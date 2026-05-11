@@ -75,6 +75,19 @@
 .fine-item.paid .fine-amount { color: var(--accent3); }
 .fine-desc { font-size: 12px; color: var(--text-dim); line-height: 1.5; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* 탭 알림 점 */
+.tab-dot {
+  display: none;
+  width: 8px;
+  height: 8px;
+  background: var(--accent2);
+  border-radius: 50%;
+  margin-left: 6px;
+  vertical-align: middle;
+  box-shadow: 0 0 6px rgba(255,107,107,0.6);
+}
+.tab-dot.show { display: inline-block; }
 </style>
 </head>
 <body>
@@ -114,10 +127,10 @@
   <!-- 탭 -->
   <div class="tab-bar" style="overflow-x:auto;">
     <button class="tab-btn active" data-tab="tx">💸 거래</button>
-    <button class="tab-btn" data-tab="notice">📢 공지</button>
+    <button class="tab-btn" data-tab="notice">📢 공지<span class="tab-dot" id="dot-notice"></span></button>
     <button class="tab-btn" data-tab="diary">📓 일지</button>
-    <button class="tab-btn" data-tab="mission">🎯 미션</button>
-    <button class="tab-btn" data-tab="fine">📄 고지서</button>
+    <button class="tab-btn" data-tab="mission">🎯 미션<span class="tab-dot" id="dot-mission"></span></button>
+    <button class="tab-btn" data-tab="fine">📄 고지서<span class="tab-dot" id="dot-fine"></span></button>
     <button class="tab-btn" data-tab="board">🗒️ 의견판</button>
   </div>
 
@@ -212,7 +225,7 @@
 
 <script type="module">
   import { requireLogin, clearSession } from "../auth.js";
-  import { getStudentByName, getTransactions, getNotices, confirmNotice, getFines, getNationConfig, getAllStudents, addDiary, getMyDiaries, getWeekDiaryCount, getMissions, applyMission, addBoardPost, getBoardPosts } from "../db.js";
+  import { getStudentByName, getTransactions, getNotices, confirmNotice, getFines, getNationConfig, getAllStudents, addDiary, getMyDiaries, getWeekDiaryCount, getMissions, applyMission, getMissionApps, addBoardPost, getBoardPosts } from "../db.js";
 
   const session = requireLogin();
   if (!session) throw new Error("로그인 필요");
@@ -255,6 +268,45 @@
     }
 
     loadTx();
+    updateTabBadges();
+  }
+
+  // 탭 알림 점 갱신 — 공지/미션/고지서에 신경 쓸 일 있으면 빨간 점 표시
+  async function updateTabBadges() {
+    try {
+      const [notices, missions, missionApps, fines] = await Promise.all([
+        getNotices(),
+        getMissions(),
+        getMissionApps(),
+        getFines(name)
+      ]);
+
+      // 공지: 내가 확인 안 한 공지가 있나
+      const hasUnconfirmedNotice = notices.some(n => !(n.confirmedBy || []).includes(name));
+
+      // 미션: 내가 아직 신청 안 한 활성 미션이 있나 (반려된 건 다시 신청 가능하므로 제외)
+      const myApplied = new Set(
+        missionApps
+          .filter(a => a.studentName === name && a.status !== "반려")
+          .map(a => a.missionId)
+      );
+      const hasNewMission = missions.some(m => !myApplied.has(m.id));
+
+      // 고지서: 미납 고지서가 있나
+      const hasUnpaidFine = fines.some(f => !f.paid);
+
+      toggleDot("dot-notice", hasUnconfirmedNotice);
+      toggleDot("dot-mission", hasNewMission);
+      toggleDot("dot-fine", hasUnpaidFine);
+    } catch (e) {
+      console.warn("탭 알림 갱신 실패:", e);
+    }
+  }
+
+  function toggleDot(id, show) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.toggle("show", !!show);
   }
 
   async function loadTx() {
@@ -372,6 +424,7 @@
       await confirmNotice(noticeId, name);
       showToast("✅ 공지 확인 완료!");
       loadNotices();
+      updateTabBadges();
     } catch(e) {
       showToast("오류가 발생했어요", true);
       btn.disabled = false;
@@ -470,6 +523,7 @@
           await applyMission(this.dataset.id, name, this.dataset.title, reward);
           showToast(`🎯 "${this.dataset.title}" 신청 완료! 승인 후 ${reward.toLocaleString()}원 지급돼요`);
           this.textContent = "신청됨 ✅";
+          updateTabBadges();
         } catch(e) {
           showToast("오류: " + e.message, true);
           this.disabled = false;
