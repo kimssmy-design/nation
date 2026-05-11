@@ -181,8 +181,9 @@
   <div id="panel-mission" style="display:none;">
     <div class="card" style="margin-bottom:14px;">
       <div style="font-size:14px;font-weight:700;margin-bottom:12px;">🎯 새 미션 등록</div>
-      <div class="input-group"><label>미션 제목</label><input type="text" id="missionTitle" placeholder="예: 교실 청소 돕기"></div>
-      <div class="input-group"><label>미션 설명</label><input type="text" id="missionDesc" placeholder="예: 청소 시간에 자발적으로 참여하기"></div>
+      <div class="input-group"><label>미션 제목</label><input type="text" id="missionTitle" placeholder="예: 환경의식 설문조사 참여"></div>
+      <div class="input-group"><label>미션 설명</label><input type="text" id="missionDesc" placeholder="예: 구글폼 링크에서 응답하기 (https://forms.gle/xxx)"></div>
+      <div class="input-group"><label>완료 조건 (선택)</label><textarea id="missionCondition" placeholder="예: 응답 완료 후 마지막 페이지를 캡쳐해서 담임샘에게 직접 보여주기" style="background:var(--navy-mid);border:1px solid var(--navy-light);border-radius:8px;padding:10px;color:var(--text);font-family:'Noto Sans KR',sans-serif;font-size:13px;width:100%;height:60px;resize:none;outline:none;box-sizing:border-box;"></textarea></div>
       <div class="input-group"><label>보상 금액 (원)</label>
         <select id="missionReward">
           <option value="500">500원</option>
@@ -193,7 +194,14 @@
       </div>
       <button class="btn btn-gold" onclick="doAddMission()">미션 등록하기</button>
     </div>
+
+    <!-- 활성 미션 목록 -->
+    <div style="font-size:13px;font-weight:700;color:var(--text-dim);margin:18px 0 8px;">🎯 활성 미션</div>
     <div id="missionManageList"></div>
+
+    <!-- 미션 완료 신청 (대기중) -->
+    <div style="font-size:13px;font-weight:700;color:var(--text-dim);margin:24px 0 8px;">📥 미션 완료 신청 (승인 대기)</div>
+    <div id="missionAppsList"></div>
   </div>
 
   <!-- 일지 관리 -->
@@ -353,6 +361,7 @@
     getNotices, addNotice,
     getAllReports, updateReport,
     issueFine, getFines, payFine, addMission, getMissions, closeMission,
+    getMissionApps, approveMission, rejectMission,
     getMyDiaries, getWeekDiaryCount, getThisWeekDiaries,
     getBoardPosts, deleteBoardPost
   } from "../db.js";

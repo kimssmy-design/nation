@@ -222,9 +222,9 @@ function getWeekKey() {
 // 미션
 // ══════════════════════════════
 
-export async function addMission(title, desc, reward, by) {
+export async function addMission(title, desc, condition, reward, by) {
   await addDoc(collection(db, "missions"), {
-    title, desc, reward, by,
+    title, desc, condition, reward, by,
     active: true,
     createdAt: serverTimestamp(),
   });
@@ -238,9 +238,9 @@ export async function getMissions() {
     .sort((a, b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
 }
 
-export async function applyMission(missionId, studentName, missionTitle) {
+export async function applyMission(missionId, studentName, missionTitle, reward) {
   await addDoc(collection(db, "missionApps"), {
-    missionId, studentName, missionTitle,
+    missionId, studentName, missionTitle, reward,
     status: "신청",
     createdAt: serverTimestamp(),
   });
