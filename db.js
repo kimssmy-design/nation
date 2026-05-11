@@ -200,6 +200,16 @@ export async function getWeekDiaryCount(name) {
     .filter(d => d.name === name && d.week === week).length;
 }
 
+// 이번 주 일지 전체 조회 (마스터 일지 관리용 — 한 번만 호출해서 학생별 그룹핑)
+export async function getThisWeekDiaries() {
+  const week = getWeekKey();
+  const snap = await getDocs(collection(db, "diaries"));
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .filter(d => d.week === week)
+    .sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+}
+
 function getWeekKey() {
   const now = new Date();
   const year = now.getFullYear();

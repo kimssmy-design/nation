@@ -353,7 +353,7 @@
     getNotices, addNotice,
     getAllReports, updateReport,
     issueFine, getFines, payFine, addMission, getMissions, closeMission,
-    getMyDiaries, getWeekDiaryCount,
+    getMyDiaries, getWeekDiaryCount, getThisWeekDiaries,
     getBoardPosts, deleteBoardPost
   } from "../db.js";
 
@@ -757,33 +757,57 @@
     loadMissionManage();
   };
 
-  // 일지 관리 (주 3회 이상 달성자 확인 + 보상 지급)
+  // 일지 관리 (주 3회 이상 달성자 확인 + 보상 지급) — 내용도 함께 표시
   async function loadDiaryManage() {
-    const students = await getAllStudents();
+    // 학생 명단 + 이번 주 일지 한 번에 가져오기 (네트워크 호출 최소화)
+    const [students, weekDiaries] = await Promise.all([getAllStudents(), getThisWeekDiaries()]);
     const realStudents = students.filter(s => s.role !== "테스터");
+
+    // 학생별로 일지 그룹핑 (시간순 정렬은 getThisWeekDiaries에서 이미 처리)
+    const byStudent = {};
+    weekDiaries.forEach(d => {
+      if (!byStudent[d.name]) byStudent[d.name] = [];
+      byStudent[d.name].push(d);
+    });
+
+    const escape = str => (str || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
     let html = "";
     for (const s of realStudents) {
-      const count = await getWeekDiaryCount(s.name);
-      if (count > 0) {
-        const reached = count >= 3;
-        html += `
-          <div class="card" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:12px;">
+      const diaries = byStudent[s.name] || [];
+      const count = diaries.length;
+      if (count === 0) continue; // 이번 주 작성 안 한 학생은 스킵
+
+      const reached = count >= 3;
+      const diaryItems = diaries.map(d => {
+        const date = d.createdAt?.toDate
+          ? d.createdAt.toDate().toLocaleDateString("ko-KR", { month: "numeric", day: "numeric", weekday: "short" })
+          : "";
+        return `<div style="background:var(--navy-mid);border-radius:6px;padding:8px 10px;margin-top:6px;font-size:12px;line-height:1.5;color:var(--text);">
+          <span style="color:var(--text-dim);margin-right:8px;">📓 ${date}</span>${escape(d.content)}
+        </div>`;
+      }).join("");
+
+      html += `
+        <div class="card" style="margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
             <div>
               <div style="font-size:14px;font-weight:700;">${s.name}</div>
               <div style="font-size:12px;color:${reached ? "var(--accent3)" : "var(--text-dim)"};">이번 주 ${count}회 작성 ${reached ? "✅ 보상 지급 가능" : "(3회 미달)"}</div>
             </div>
-            ${reached ? `<button class="btn btn-gold btn-sm" onclick="doPayDiary('${s.name}',${count})">💰 ${(count*100).toLocaleString()}원 지급</button>` : ""}
-          </div>`;
-      }
+            ${reached ? `<button class="btn btn-gold btn-sm" onclick="doPayDiary('${s.name}')">💰 1,000원 지급</button>` : ""}
+          </div>
+          ${diaryItems}
+        </div>`;
     }
+
     if (!html) html = `<div class="empty-state"><div class="emoji">📓</div>이번 주 작성한 학생이 없어요</div>`;
     document.getElementById("diaryManageList").innerHTML = html;
   }
 
-  window.doPayDiary = async function(name, count) {
-    const amount = count * 100;
-    await addTransaction(name, amount, "칭찬쿠폰", `시민일지 보상 (${count}회×100원)`, "마스터");
-    showToast(`✅ ${name}에게 ${amount.toLocaleString()}원 지급 완료!`);
+  window.doPayDiary = async function(name) {
+    await addTransaction(name, 1000, "칭찬쿠폰", `시민일지 보상 (주 3회 이상 달성)`, "마스터");
+    showToast(`✅ ${name}에게 1,000원 지급 완료!`);
     loadDiaryManage();
   };
 
