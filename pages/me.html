@@ -148,9 +148,9 @@
         <div style="font-size:14px;font-weight:700;">📓 이번 주 시민일지</div>
         <div id="diaryWeekCount" style="font-size:12px;color:var(--text-dim);"></div>
       </div>
-      <textarea id="diaryContent" maxlength="20" placeholder="오늘 느낀 점을 짧게! (최대 20자)" style="background:var(--navy-mid);border:1px solid var(--navy-light);border-radius:8px;padding:10px;color:var(--text);font-family:'Noto Sans KR',sans-serif;font-size:13px;width:100%;height:60px;resize:none;outline:none;"></textarea>
+      <textarea id="diaryContent" maxlength="100" placeholder="오늘 느낀 점을 적어보세요 (20자 이상 ~ 100자 이하)" style="background:var(--navy-mid);border:1px solid var(--navy-light);border-radius:8px;padding:10px;color:var(--text);font-family:'Noto Sans KR',sans-serif;font-size:13px;width:100%;height:90px;resize:none;outline:none;"></textarea>
       <div style="display:flex;justify-content:flex-end;margin-top:4px;">
-        <span id="diaryCharCount" style="font-size:11px;color:var(--text-dim);">0 / 20</span>
+        <span id="diaryCharCount" style="font-size:11px;color:var(--text-dim);">0 / 100 (최소 20자)</span>
       </div>
       <button class="btn btn-gold btn-full" style="margin-top:8px;" onclick="submitDiary()">📝 일지 작성하기</button>
       <div style="font-size:11px;color:var(--text-dim);margin-top:6px;text-align:center;">주 3회 이상 작성 시 1,000원 지급 (마스터 확인 후)</div>
@@ -411,23 +411,28 @@
     }).join("");
   }
 
-  // 일지 글자수 카운터
+  // 일지 글자수 카운터 (20자 미만이면 빨간색, 20자 이상이면 초록색)
   document.getElementById("diaryContent").addEventListener("input", function() {
-    document.getElementById("diaryCharCount").textContent = this.value.length + " / 20";
+    const len = this.value.length;
+    const counter = document.getElementById("diaryCharCount");
+    counter.textContent = `${len} / 100 (최소 20자)`;
+    counter.style.color = len < 20 ? "var(--accent2)" : "var(--accent3)";
   });
 
   window.submitDiary = async function() {
     const content = document.getElementById("diaryContent").value.trim();
     if (!content) return showToast("내용을 입력해주세요", true);
-    if (content.length < 5) return showToast("5자 이상 작성해주세요", true);
-    if (content.length > 20) return showToast("20자 이내로 작성해주세요", true);
+    if (content.length < 20) return showToast("20자 이상 작성해주세요", true);
+    if (content.length > 100) return showToast("100자 이내로 작성해주세요", true);
     const btn = event.target;
     btn.disabled = true;
     try {
       await addDiary(name, content);
       showToast("📓 일지 작성 완료! 주 3회 달성 시 1,000원 지급돼요 😊");
       document.getElementById("diaryContent").value = "";
-      document.getElementById("diaryCharCount").textContent = "0 / 20";
+      const counter = document.getElementById("diaryCharCount");
+      counter.textContent = "0 / 100 (최소 20자)";
+      counter.style.color = "var(--text-dim)";
       loadDiary();
     } catch(e) {
       showToast("오류: " + e.message, true);
