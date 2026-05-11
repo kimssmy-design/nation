@@ -448,14 +448,17 @@
       document.getElementById("mission-empty").style.display = "block";
       return;
     }
+    const escape = str => (str || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
     document.getElementById("missionList").innerHTML = missions.map(m => `
       <div class="card" style="margin-bottom:10px;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
-          <div style="font-size:15px;font-weight:700;">🎯 ${m.title}</div>
+          <div style="font-size:15px;font-weight:700;">🎯 ${escape(m.title)}</div>
           <div style="font-family:'Gmarket Sans',sans-serif;font-size:16px;color:var(--gold);font-weight:700;">+${(m.reward||0).toLocaleString()}원</div>
         </div>
-        <div style="font-size:13px;color:var(--text-dim);margin-bottom:10px;">${m.desc}</div>
-        <button class="btn btn-gold btn-sm mission-apply-btn" data-id="${m.id}" data-title="${m.title}" data-reward="${m.reward||0}">완료 신청하기</button>
+        <div style="font-size:13px;color:var(--text-dim);margin-bottom:10px;line-height:1.5;">${escape(m.desc)}</div>
+        ${m.condition ? `<div style="font-size:12px;color:var(--accent3);background:rgba(105,240,174,0.08);border-left:3px solid var(--accent3);padding:8px 12px;border-radius:4px;margin-bottom:10px;line-height:1.5;"><span style="font-weight:700;">✅ 완료 조건</span><br>${escape(m.condition)}</div>` : ""}
+        <button class="btn btn-gold btn-sm mission-apply-btn" data-id="${m.id}" data-title="${escape(m.title)}" data-reward="${m.reward||0}">완료 신청하기</button>
       </div>`).join("");
 
     // 미션 신청 버튼 이벤트
@@ -463,8 +466,9 @@
       btn.addEventListener("click", async function() {
         this.disabled = true;
         try {
-          await applyMission(this.dataset.id, name, this.dataset.title);
-          showToast(`🎯 "${this.dataset.title}" 신청 완료! 승인 후 ${parseInt(this.dataset.reward).toLocaleString()}원 지급돼요`);
+          const reward = parseInt(this.dataset.reward) || 0;
+          await applyMission(this.dataset.id, name, this.dataset.title, reward);
+          showToast(`🎯 "${this.dataset.title}" 신청 완료! 승인 후 ${reward.toLocaleString()}원 지급돼요`);
           this.textContent = "신청됨 ✅";
         } catch(e) {
           showToast("오류: " + e.message, true);

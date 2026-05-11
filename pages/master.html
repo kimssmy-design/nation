@@ -731,32 +731,75 @@
     loadTaxFines();
   };
 
-  // 미션 관리
+  // 미션 관리 — 활성 미션 + 완료 신청 목록 함께 로드
   async function loadMissionManage() {
+    await Promise.all([loadActiveMissions(), loadMissionApps()]);
+  }
+
+  // 활성 미션 목록
+  async function loadActiveMissions() {
     const missions = await getMissions();
+    const escape = str => (str || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
     if (missions.length === 0) {
       document.getElementById("missionManageList").innerHTML = `<div class="empty-state"><div class="emoji">🎯</div>등록된 미션이 없어요</div>`;
       return;
     }
     document.getElementById("missionManageList").innerHTML = missions.map(m => `
-      <div class="card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:12px;">
-        <div>
-          <div style="font-size:14px;font-weight:700;">🎯 ${m.title}</div>
-          <div style="font-size:12px;color:var(--text-dim);">${m.desc} · <span style="color:var(--gold);">+${(m.reward||0).toLocaleString()}원</span></div>
+      <div class="card" style="margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+          <div style="flex:1;">
+            <div style="font-size:14px;font-weight:700;">🎯 ${escape(m.title)}</div>
+            <div style="font-size:12px;color:var(--text-dim);margin-top:2px;">${escape(m.desc)}</div>
+            ${m.condition ? `<div style="font-size:11px;color:var(--accent3);margin-top:6px;background:rgba(105,240,174,0.08);border-left:3px solid var(--accent3);padding:6px 10px;border-radius:4px;">✅ 완료 조건: ${escape(m.condition)}</div>` : ""}
+            <div style="font-size:12px;color:var(--gold);font-weight:700;margin-top:6px;">+${(m.reward||0).toLocaleString()}원</div>
+          </div>
+          <button class="btn btn-danger btn-sm" onclick="doCloseMission('${m.id}')">마감</button>
         </div>
-        <button class="btn btn-danger btn-sm" onclick="doCloseMission('${m.id}')">마감</button>
       </div>`).join("");
+  }
+
+  // 미션 완료 신청 (승인 대기중인 것만)
+  async function loadMissionApps() {
+    const apps = await getMissionApps();
+    const pending = apps.filter(a => a.status === "신청");
+
+    if (pending.length === 0) {
+      document.getElementById("missionAppsList").innerHTML = `<div class="empty-state" style="padding:20px 12px;"><div class="emoji">📥</div>처리할 신청이 없어요</div>`;
+      return;
+    }
+
+    const escape = str => (str || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
+    document.getElementById("missionAppsList").innerHTML = pending.map(a => {
+      const date = a.createdAt?.toDate
+        ? a.createdAt.toDate().toLocaleString("ko-KR", { month: "numeric", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit" })
+        : "";
+      const reward = a.reward || 0;
+      return `
+        <div class="card" style="margin-bottom:10px;">
+          <div style="font-size:14px;font-weight:700;margin-bottom:4px;">${escape(a.studentName)}</div>
+          <div style="font-size:12px;color:var(--text-dim);margin-bottom:2px;">🎯 ${escape(a.missionTitle)} <span style="color:var(--gold);">+${reward.toLocaleString()}원</span></div>
+          <div style="font-size:11px;color:var(--text-dim);margin-bottom:10px;">${date} 신청</div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-gold btn-sm" style="flex:1;" onclick="doApproveMission('${a.id}','${escape(a.studentName)}',${reward})">✅ 승인 지급</button>
+            <button class="btn btn-outline btn-sm" style="flex:1;" onclick="doRejectMission('${a.id}')">❌ 반려</button>
+          </div>
+        </div>`;
+    }).join("");
   }
 
   window.doAddMission = async function() {
     const title = document.getElementById("missionTitle").value.trim();
     const desc = document.getElementById("missionDesc").value.trim();
+    const condition = document.getElementById("missionCondition").value.trim();
     const reward = parseInt(document.getElementById("missionReward").value);
     if (!title || !desc) return showToast("제목과 설명을 입력해주세요", true);
-    await addMission(title, desc, reward, "마스터");
+    await addMission(title, desc, condition, reward, "마스터");
     showToast("🎯 미션이 등록됐어요!");
     document.getElementById("missionTitle").value = "";
     document.getElementById("missionDesc").value = "";
+    document.getElementById("missionCondition").value = "";
     loadMissionManage();
   };
 
@@ -764,6 +807,27 @@
     await closeMission(id);
     showToast("미션이 마감됐어요");
     loadMissionManage();
+  };
+
+  window.doApproveMission = async function(appId, studentName, reward) {
+    try {
+      await approveMission(appId, studentName, reward, "마스터");
+      showToast(`✅ ${studentName}에게 ${reward.toLocaleString()}원 지급 완료!`);
+      loadMissionApps();
+    } catch(e) {
+      showToast("오류: " + e.message, true);
+    }
+  };
+
+  window.doRejectMission = async function(appId) {
+    if (!confirm("이 신청을 반려할까요? (학생에게 보상 지급되지 않음)")) return;
+    try {
+      await rejectMission(appId);
+      showToast("신청이 반려됐어요");
+      loadMissionApps();
+    } catch(e) {
+      showToast("오류: " + e.message, true);
+    }
   };
 
   // 일지 관리 (주 3회 이상 달성자 확인 + 보상 지급) — 내용도 함께 표시
