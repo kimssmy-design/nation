@@ -314,12 +314,15 @@
   <div class="modal-box">
     <div class="modal-title">🚨 신고 처리</div>
     <input type="hidden" id="reportModalId">
+    <input type="hidden" id="reportModalReporter">
+    <input type="hidden" id="reportModalRewarded">
     <div class="input-group">
       <label>처리 상태</label>
       <select id="reportModalStatus">
         <option value="접수됨">접수됨</option>
         <option value="조사중">조사중</option>
         <option value="처리완료">처리완료</option>
+        <option value="기각">기각</option>
       </select>
     </div>
     <div class="input-group">
@@ -327,8 +330,13 @@
       <input type="text" id="reportModalResult" placeholder="예: 벌금 2,000원 부과">
     </div>
     <div class="input-group">
-      <label>벌금 금액 (없으면 0)</label>
+      <label>벌금 금액 (가해자에게, 없으면 0)</label>
       <input type="number" id="reportModalFine" value="0" step="500">
+    </div>
+    <div class="input-group">
+      <label>신고자 보상금 (학급 기여도에 따라 임의 책정, 없으면 0)</label>
+      <input type="number" id="reportModalReward" value="0" step="100">
+      <div id="reportRewardHint" style="font-size:11px;color:var(--text-dim);margin-top:4px;"></div>
     </div>
     <div style="display:flex;gap:8px;margin-top:8px;">
       <button class="btn btn-outline" style="flex:1;" onclick="closeReportModal()">취소</button>
@@ -517,10 +525,13 @@
       "접수됨": `<span class="badge badge-gold">접수됨</span>`,
       "조사중": `<span class="badge badge-blue">조사중</span>`,
       "처리완료": `<span class="badge badge-green">처리완료</span>`,
+      "기각": `<span class="badge badge-red">기각</span>`,
     };
 
     document.getElementById("reportManageList").innerHTML = reports.map(r => {
       const date = r.createdAt?.toDate ? r.createdAt.toDate().toLocaleDateString("ko-KR", { month:"numeric", day:"numeric" }) : "";
+      const rewarded = r.rewarded === true;
+      const rewardAmt = r.reward || 0;
       return `
         <div class="report-manage-item">
           <div class="report-manage-top">
@@ -531,9 +542,10 @@
             ${statusBadge[r.status] || r.status}
           </div>
           <div class="report-manage-desc">${r.content}</div>
-          ${r.result ? `<div style="font-size:12px;color:var(--accent3);margin-bottom:8px;">처리결과: ${r.result}</div>` : ""}
+          ${r.result ? `<div style="font-size:12px;color:var(--accent3);margin-bottom:4px;">처리결과: ${r.result}</div>` : ""}
+          ${rewarded ? `<div style="font-size:11px;color:var(--gold);margin-bottom:8px;">💰 신고자 보상 ${rewardAmt.toLocaleString()}원 지급 완료</div>` : ""}
           <div class="report-actions">
-            <button class="btn btn-outline btn-sm" onclick="openReportModal('${r.id}','${r.status}','${r.result||""}',${r.fine||0})">상태 변경</button>
+            <button class="btn btn-outline btn-sm" onclick="openReportModal('${r.id}','${r.status}','${(r.result||"").replace(/'/g,"\\'")}',${r.fine||0},${rewardAmt},'${r.reporterName}',${rewarded})">상태 변경</button>
             <button class="btn btn-danger btn-sm" onclick="openFineModal('${r.reporterName}')">고지서 발행</button>
           </div>
         </div>`;
@@ -623,11 +635,18 @@
   };
 
   // 신고 처리 모달
-  window.openReportModal = function(id, status, result, fine) {
+  window.openReportModal = function(id, status, result, fine, reward, reporter, rewarded) {
     document.getElementById("reportModalId").value = id;
+    document.getElementById("reportModalReporter").value = reporter || "";
+    document.getElementById("reportModalRewarded").value = rewarded ? "true" : "false";
     document.getElementById("reportModalStatus").value = status;
     document.getElementById("reportModalResult").value = result;
     document.getElementById("reportModalFine").value = fine;
+    document.getElementById("reportModalReward").value = reward || 0;
+    // 이미 지급된 경우 안내
+    document.getElementById("reportRewardHint").textContent = rewarded
+      ? "⚠️ 이미 보상금이 지급된 신고예요. 금액을 바꿔도 추가 지급되지 않아요."
+      : "처리완료 + 금액 > 0 일 때 신고자에게 자동 입금됩니다.";
     document.getElementById("reportModal").style.display = "flex";
   };
   window.closeReportModal = function() {
@@ -635,11 +654,31 @@
   };
   window.doUpdateReport = async function() {
     const id = document.getElementById("reportModalId").value;
+    const reporter = document.getElementById("reportModalReporter").value;
+    const wasRewarded = document.getElementById("reportModalRewarded").value === "true";
     const status = document.getElementById("reportModalStatus").value;
     const result = document.getElementById("reportModalResult").value;
     const fine = parseInt(document.getElementById("reportModalFine").value) || 0;
-    await updateReport(id, status, result, fine);
-    showToast("✅ 신고 처리 완료!");
+    const reward = parseInt(document.getElementById("reportModalReward").value) || 0;
+
+    await updateReport(id, status, result, fine, reward);
+
+    // 처리완료 + 보상 > 0 + 아직 지급 안 된 경우에만 자동 입금
+    if (status === "처리완료" && reward > 0 && !wasRewarded && reporter) {
+      try {
+        await addTransaction(reporter, reward, "이벤트", "신고보상금", "마스터");
+        // 중복 지급 방지 플래그
+        const { updateDoc, doc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+        const { db } = await import("../firebase.js");
+        await updateDoc(doc(db, "reports", id), { rewarded: true });
+        showToast(`✅ 처리 완료! ${reporter}에게 ${reward.toLocaleString()}원 지급`);
+      } catch (e) {
+        showToast("처리됐지만 보상 지급 실패: " + e.message, true);
+      }
+    } else {
+      showToast("✅ 신고 처리 완료!");
+    }
+
     closeReportModal();
     loadReports();
   };

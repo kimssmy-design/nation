@@ -129,8 +129,8 @@ export async function getPublicReports() {
   const reports = await getAllReports();
   return reports.map(r => ({ id: r.id, type: r.type, content: r.content, status: r.status, result: r.result, createdAt: r.createdAt }));
 }
-export async function updateReport(reportId, status, result, fine) {
-  await updateDoc(doc(db, "reports", reportId), { status, result, fine });
+export async function updateReport(reportId, status, result, fine, reward = 0) {
+  await updateDoc(doc(db, "reports", reportId), { status, result, fine, reward });
 }
 
 // 고지서

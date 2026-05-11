@@ -50,9 +50,16 @@
   display: flex; justify-content: space-between;
   align-items: flex-start; gap: 8px; margin-bottom: 6px;
 }
-.notice-title { font-size: 14px; font-weight: 700; }
-.notice-desc { font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+.notice-title { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+.notice-toggle-icon { font-size: 10px; color: var(--text-dim); }
+.notice-desc {
+  font-size: 12px; color: var(--text-dim); line-height: 1.6;
+  white-space: pre-wrap;      /* 줄바꿈 살리기 */
+  word-break: break-word;
+}
 .notice-date { font-size: 11px; color: var(--text-dim); margin-top: 6px; }
+.notice-header { cursor: pointer; }
+.notice-header:hover .notice-title { color: var(--gold); }
 
 /* 고지서 */
 .fine-item {
@@ -348,22 +355,49 @@
       return;
     }
 
-    document.getElementById("noticeList").innerHTML = notices.map(n => {
+    const escape = str => (str || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
+    document.getElementById("noticeList").innerHTML = notices.map((n, idx) => {
       const confirmed = (n.confirmedBy || []).includes(name);
       const date = n.createdAt?.toDate ? n.createdAt.toDate().toLocaleDateString("ko-KR", { month:"numeric", day:"numeric" }) : "";
+      const isLatest = idx === 0;  // notices는 최신순 정렬됨 → 최신 1개만 펼침
       return `
-        <div class="notice-item ${confirmed ? "checked" : ""}">
-          <div class="notice-top">
-            <div class="notice-title">${n.title}</div>
-            ${confirmed
-              ? `<span class="badge badge-green">✓ 확인완료</span>`
-              : `<button class="btn btn-gold btn-sm" onclick="doConfirm('${n.id}', this)">확인</button>`}
+        <div class="notice-item ${confirmed ? "checked" : ""}" data-expanded="${isLatest ? "true" : "false"}">
+          <div class="notice-header" onclick="toggleNotice(this)">
+            <div class="notice-top">
+              <div class="notice-title">
+                <span class="notice-toggle-icon">${isLatest ? "▼" : "▶"}</span>
+                ${escape(n.title)}
+              </div>
+              ${confirmed
+                ? `<span class="badge badge-green">✓ 확인완료</span>`
+                : `<button class="btn btn-gold btn-sm" onclick="event.stopPropagation();doConfirm('${n.id}', this)">확인</button>`}
+            </div>
           </div>
-          <div class="notice-desc">${n.content}</div>
-          <div class="notice-date">${date} · ${n.by || ""}</div>
+          <div class="notice-body" style="display:${isLatest ? "block" : "none"};">
+            <div class="notice-desc">${escape(n.content)}</div>
+            <div class="notice-date">${date} · ${escape(n.by || "")}</div>
+          </div>
         </div>`;
     }).join("");
   }
+
+  // 공지 접기/펼치기 토글
+  window.toggleNotice = function(headerEl) {
+    const item = headerEl.closest(".notice-item");
+    const body = item.querySelector(".notice-body");
+    const icon = item.querySelector(".notice-toggle-icon");
+    const expanded = item.dataset.expanded === "true";
+    if (expanded) {
+      body.style.display = "none";
+      icon.textContent = "▶";
+      item.dataset.expanded = "false";
+    } else {
+      body.style.display = "block";
+      icon.textContent = "▼";
+      item.dataset.expanded = "true";
+    }
+  };
 
   async function loadFines() {
     document.getElementById("fine-spinner").style.display = "block";
