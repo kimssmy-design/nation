@@ -689,16 +689,21 @@
 
   function renderUpcoming() {
     const todayStr = ymd(new Date());
-    const upcoming = schedulesCache
-      .filter(s => (s.endDate || s.startDate) >= todayStr)
-      .sort((a,b) => (a.startDate || "").localeCompare(b.startDate || ""))
-      .slice(0, 5);
+    // 오늘 이상 시작하는 일정만 정렬
+    const future = schedulesCache
+      .filter(s => (s.startDate || "") >= todayStr)
+      .sort((a,b) => (a.startDate || "").localeCompare(b.startDate || ""));
 
-    if (upcoming.length === 0) {
+    if (future.length === 0) {
       document.getElementById("upcomingList").innerHTML = "";
       document.getElementById("upcoming-empty").style.display = "block";
       return;
     }
+
+    // 가장 가까운 시작일과 같은 날짜의 일정만 모두 표시
+    const earliestDate = future[0].startDate;
+    const upcoming = future.filter(s => s.startDate === earliestDate);
+
     document.getElementById("upcoming-empty").style.display = "none";
     document.getElementById("upcomingList").innerHTML = upcoming.map(s => {
       const d = diffDays(s.startDate);
