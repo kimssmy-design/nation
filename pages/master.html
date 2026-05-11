@@ -156,7 +156,7 @@
     <button class="tab-btn" onclick="switchTab('report', this)">🚨 신고 관리</button>
     <button class="tab-btn" onclick="switchTab('money', this)">💸 가상화폐</button>
     <button class="tab-btn" onclick="switchTab('setting', this)">⚙️ 국가 설정</button>
-    <button class="tab-btn" onclick="switchTab('board', this)">🗒️ 의견판</button>
+    <button class="tab-btn" onclick="switchTab('schedule', this)">📅 국가 일정</button>
   </div>
 
   <!-- 학생 관리 -->
@@ -345,21 +345,50 @@
   </div>
 </div>
 
-<!-- 의견판 관리 패널 (master-wrap 바깥이지만 switchTab으로 show/hide) -->
-<div id="panel-board" style="display:none;max-width:860px;margin:0 auto;padding:0 16px 80px;">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-    <div style="font-size:14px;font-weight:700;">🗒️ 학생 의견 포스트잇</div>
-    <button class="btn btn-outline btn-sm" onclick="loadBoardManage()">🔄 새로고침</button>
+<!-- 국가 일정 관리 패널 (master-wrap 바깥이지만 switchTab으로 show/hide) -->
+<div id="panel-schedule" style="display:none;max-width:860px;margin:0 auto;padding:0 16px 80px;">
+  <!-- 등록 폼 -->
+  <div class="card" style="margin-bottom:14px;">
+    <div style="font-size:14px;font-weight:700;margin-bottom:12px;">📅 새 일정 등록</div>
+    <div class="input-group">
+      <label>시작일</label>
+      <input type="date" id="schStartDate">
+    </div>
+    <div class="input-group">
+      <label>종료일 (당일이면 시작일과 동일하게)</label>
+      <input type="date" id="schEndDate">
+    </div>
+    <div class="input-group">
+      <label>일정 내용</label>
+      <input type="text" id="schTitle" placeholder="예: 공습대피훈련 / 회복적 생활교육">
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <button class="btn btn-gold" onclick="doAddSchedule()">+ 일정 등록</button>
+      <label class="btn btn-outline" style="cursor:pointer;">
+        📥 엑셀 가져오기
+        <input type="file" id="schExcelFile" accept=".xlsx,.xls" style="display:none;">
+      </label>
+      <span style="font-size:11px;color:var(--text-dim);">A열=날짜(2026-05-13), B열=일정</span>
+    </div>
   </div>
-  <div class="spinner" id="board-manage-spinner"></div>
-  <div id="boardManageGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;"></div>
-  <div class="empty-state" id="board-manage-empty" style="display:none;">
-    <div class="emoji">🗒️</div>
-    아직 붙여진 의견이 없어요
+
+  <!-- 일정 목록 -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+    <div style="font-size:13px;font-weight:700;color:var(--text-dim);">📋 전체 일정</div>
+    <button class="btn btn-outline btn-sm" onclick="loadScheduleManage()">🔄 새로고침</button>
+  </div>
+  <div class="spinner" id="schedule-spinner"></div>
+  <div id="scheduleManageList"></div>
+  <div class="empty-state" id="schedule-empty" style="display:none;">
+    <div class="emoji">📅</div>
+    등록된 일정이 없어요
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- SheetJS (엑셀 가져오기용) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <script type="module">
   import { requireMaster, clearSession } from "../auth.js";
@@ -371,7 +400,7 @@
     issueFine, getFines, payFine, addMission, getMissions, closeMission,
     getMissionApps, approveMission, rejectMission,
     getMyDiaries, getWeekDiaryCount, getThisWeekDiaries,
-    getBoardPosts, deleteBoardPost
+    addSchedule, getSchedules, deleteSchedule
   } from "../db.js";
 
   const session = requireMaster();
@@ -698,7 +727,7 @@
   window.switchTab = function(tab, btn) {
     document.querySelectorAll(".tab-btn").forEach(t => t.classList.remove("active"));
     btn.classList.add("active");
-    ["students","notice","report","money","setting","mission","diary","tax","board"].forEach(t => {
+    ["students","notice","report","money","setting","mission","diary","tax","schedule"].forEach(t => {
       const el = document.getElementById("panel-" + t);
       if (el) el.style.display = t === tab ? "block" : "none";
     });
@@ -707,7 +736,7 @@
     if (tab === "mission") loadMissionManage();
     if (tab === "diary") loadDiaryManage();
     if (tab === "tax") loadTaxFines();
-    if (tab === "board") loadBoardManage();
+    if (tab === "schedule") loadScheduleManage();
   };
 
   // 세금 미납 현황

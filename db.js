@@ -287,3 +287,25 @@ export async function getBoardPosts() {
 export async function deleteBoardPost(postId) {
   await deleteDoc(doc(db, "board", postId));
 }
+
+// ══════════════════════════════
+// 국가 일정
+// ══════════════════════════════
+
+export async function addSchedule(startDate, endDate, title, by) {
+  await addDoc(collection(db, "schedules"), {
+    startDate, endDate, title, by,
+    createdAt: serverTimestamp(),
+  });
+}
+
+export async function getSchedules() {
+  const snap = await getDocs(collection(db, "schedules"));
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (a.startDate || "").localeCompare(b.startDate || ""));
+}
+
+export async function deleteSchedule(scheduleId) {
+  await deleteDoc(doc(db, "schedules", scheduleId));
+}
