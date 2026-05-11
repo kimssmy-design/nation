@@ -29,21 +29,38 @@ export function clearSession() {
   sessionStorage.removeItem("sn_role");
 }
 
+// 이름 정규화 (유니코드 NFC + 공백 제거) — 보이지 않는 문자 차이 흡수
+function normalizeName(name) {
+  return (name || "").normalize("NFC").replace(/\s+/g, "");
+}
+
 // ── 일반 학생 로그인
 export async function loginStudent(name, password) {
-  const student = await getStudentByName(name);
+  // 1차 시도: 입력한 이름 그대로 찾기
+  let student = await getStudentByName(name);
+
+  // 2차 시도: 못 찾으면 전체 학생 중 "공백·유니코드 무시" 매칭으로 한 번 더
+  if (!student) {
+    const { getAllStudents } = await import("./db.js");
+    const target = normalizeName(name);
+    const all = await getAllStudents();
+    student = all.find(s => normalizeName(s.name) === target);
+  }
+
   if (!student) throw new Error("등록되지 않은 이름이에요");
+
   const hashed = await hashPassword(password);
   // 구버전 평문 비번도 호환 (마이그레이션 기간)
   if (student.password !== hashed && student.password !== password) {
     throw new Error("비밀번호가 틀렸어요");
   }
-  // 평문으로 저장된 경우 해시로 업그레이드
+  // 평문으로 저장된 경우 해시로 업그레이드 — Firestore의 실제 이름 사용
   if (student.password === password && password !== hashed) {
     const { changePassword } = await import("./db.js");
-    await changePassword(name, hashed);
+    await changePassword(student.name, hashed);
   }
-  saveSession(name, student.role);
+  // 세션에는 Firestore에 실제로 저장된 이름을 사용 (이후 조회들이 정확히 매칭되게)
+  saveSession(student.name, student.role);
   return student;
 }
 
