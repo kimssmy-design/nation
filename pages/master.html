@@ -966,42 +966,110 @@
 
   init();
 
-  // ── 의견판 관리 ──────────────────────────
-  async function loadBoardManage() {
-    document.getElementById("board-manage-spinner").style.display = "block";
-    document.getElementById("board-manage-empty").style.display = "none";
-    document.getElementById("boardManageGrid").innerHTML = "";
-    const posts = await getBoardPosts();
-    document.getElementById("board-manage-spinner").style.display = "none";
-    if (!posts.length) {
-      document.getElementById("board-manage-empty").style.display = "flex";
+  // ── 국가 일정 관리 ──────────────────────────
+  const scheduleEscape = str => (str || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  function todayStrKR() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  }
+
+  async function loadScheduleManage() {
+    // 폼 기본값 채우기
+    const t = todayStrKR();
+    const startEl = document.getElementById("schStartDate");
+    const endEl = document.getElementById("schEndDate");
+    if (!startEl.value) startEl.value = t;
+    if (!endEl.value) endEl.value = t;
+
+    document.getElementById("schedule-spinner").style.display = "block";
+    document.getElementById("schedule-empty").style.display = "none";
+    const list = await getSchedules();
+    document.getElementById("schedule-spinner").style.display = "none";
+
+    if (list.length === 0) {
+      document.getElementById("scheduleManageList").innerHTML = "";
+      document.getElementById("schedule-empty").style.display = "block";
       return;
     }
-    document.getElementById("boardManageGrid").innerHTML = posts.map(p => {
-      const date = p.createdAt?.seconds
-        ? new Date(p.createdAt.seconds * 1000).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })
-        : "";
-      const safeContent = p.content.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-      return `<div style="background:${p.color};border-radius:4px;padding:14px 12px 10px;min-height:90px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:2px 4px 10px rgba(0,0,0,0.25);position:relative;font-family:'Noto Sans KR',sans-serif;">
-        <div style="font-size:13px;color:#222;line-height:1.55;word-break:break-all;white-space:pre-wrap;">${safeContent}</div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
-          <span style="font-size:10px;color:#888;">${date}</span>
-          <button onclick="deleteBoardItem('${p.id}')" style="background:rgba(0,0,0,0.12);border:none;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;color:#555;">🗑️ 삭제</button>
+    document.getElementById("scheduleManageList").innerHTML = list.map(s => {
+      const isRange = s.startDate !== s.endDate;
+      return `<div class="card" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:12px;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:700;">🏛️ ${scheduleEscape(s.title)}</div>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:3px;">
+            ${isRange ? `${s.startDate} ~ ${s.endDate}` : s.startDate}
+          </div>
         </div>
+        <button class="btn btn-danger btn-sm" onclick="doDeleteSchedule('${s.id}')">삭제</button>
       </div>`;
     }).join("");
   }
 
-  window.deleteBoardItem = async function(postId) {
-    if (!confirm("이 포스트잇을 삭제할까요?")) return;
+  window.doAddSchedule = async function() {
+    const start = document.getElementById("schStartDate").value;
+    const end = document.getElementById("schEndDate").value || start;
+    const title = document.getElementById("schTitle").value.trim();
+    if (!start || !title) return showToast("시작일과 일정 내용을 입력해주세요", true);
+    const finalEnd = end < start ? start : end;
     try {
-      await deleteBoardPost(postId);
+      await addSchedule(start, finalEnd, title, "마스터");
+      showToast("📅 일정이 등록됐어요!");
+      document.getElementById("schTitle").value = "";
+      loadScheduleManage();
+    } catch(e) {
+      showToast("등록 오류: " + e.message, true);
+    }
+  };
+
+  window.doDeleteSchedule = async function(id) {
+    if (!confirm("이 일정을 삭제할까요?")) return;
+    try {
+      await deleteSchedule(id);
       showToast("🗑️ 삭제됐어요");
-      loadBoardManage();
+      loadScheduleManage();
     } catch(e) {
       showToast("삭제 오류: " + e.message, true);
     }
   };
+
+  // 엑셀 가져오기
+  document.getElementById("schExcelFile").addEventListener("change", async function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (typeof XLSX === "undefined") {
+      showToast("엑셀 라이브러리 로딩 실패 — 새로고침해주세요", true);
+      return;
+    }
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { raw: true, defval: "" });
+      let count = 0, fail = 0;
+      for (const row of rows) {
+        const keys = Object.keys(row);
+        const dateVal = row[keys[0]];
+        const titleVal = row[keys[1]];
+        if (!dateVal || !titleVal) { fail++; continue; }
+        let dateStr = "";
+        if (typeof dateVal === "number") {
+          const d = XLSX.SSF.parse_date_code(dateVal);
+          dateStr = `${d.y}-${String(d.m).padStart(2,"0")}-${String(d.d).padStart(2,"0")}`;
+        } else {
+          dateStr = String(dateVal).trim().replace(/\./g,"-").replace(/\s/g,"");
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) { fail++; continue; }
+        }
+        await addSchedule(dateStr, dateStr, String(titleVal).trim(), "마스터(엑셀)");
+        count++;
+      }
+      showToast(`✅ ${count}개 일정 등록${fail ? ` (${fail}개 형식 오류 건너뜀)` : ""}`);
+      loadScheduleManage();
+    } catch(err) {
+      showToast("가져오기 실패: " + err.message, true);
+    } finally {
+      e.target.value = "";
+    }
+  });
 </script>
 </body>
 </html>
