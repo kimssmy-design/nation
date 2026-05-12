@@ -223,8 +223,8 @@
     <div style="font-size:11px;color:var(--text-dim);margin-top:4px;" id="savingMsg"></div>
   </div>
 
-  <!-- 탭 -->
-  <div class="tab-bar" style="overflow-x:auto;">
+  <!-- 탭 (3x2 그리드 — 폰에서도 가로 스크롤 없음) -->
+  <div class="tab-bar" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">
     <button class="tab-btn active" data-tab="tx">💸 거래</button>
     <button class="tab-btn" data-tab="notice">📢 공지<span class="tab-dot" id="dot-notice"></span></button>
     <button class="tab-btn" data-tab="diary">📓 일지</button>
