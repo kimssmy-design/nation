@@ -274,8 +274,9 @@ body {
 .bottom-nav a.active { color: var(--primary); }
 
 /* 하단 네비 여백 — 모바일 크롬 동적 주소창·홈인디케이터 잘림 방지 */
-.has-bottom-nav {
-  padding-bottom: calc(140px + env(safe-area-inset-bottom));
+/* body 셀렉터로 specificity 높여서 각 페이지 인라인 .wrap의 padding을 덮어쓰게 함 */
+body .has-bottom-nav {
+  padding-bottom: calc(140px + env(safe-area-inset-bottom)) !important;
 }
 
 /* ── 로딩 스피너 ── */
