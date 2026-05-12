@@ -309,3 +309,115 @@ export async function getSchedules() {
 export async function deleteSchedule(scheduleId) {
   await deleteDoc(doc(db, "schedules", scheduleId));
 }
+
+// ══════════════════════════════
+// 🎁 보상 쿠폰
+// ══════════════════════════════
+
+// 보상 상품 등록 (마스터)
+// stock: 숫자면 수량 제한, null이면 무제한
+export async function addReward(title, price, emoji, stock, by) {
+  await addDoc(collection(db, "rewards"), {
+    title, price, emoji,
+    stock: stock !== null ? Number(stock) : null,
+    active: true,
+    by,
+    createdAt: serverTimestamp(),
+  });
+}
+
+// 활성 보상 목록 조회 (학생 구매 화면용)
+export async function getRewards() {
+  const snap = await getDocs(collection(db, "rewards"));
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .filter(d => d.active)
+    .sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+}
+
+// 전체 보상 목록 조회 (마스터 관리용 — 비활성 포함)
+export async function getAllRewards() {
+  const snap = await getDocs(collection(db, "rewards"));
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+}
+
+// 보상 비활성화 (삭제 대신 숨김 처리)
+export async function deactivateReward(rewardId) {
+  await updateDoc(doc(db, "rewards", rewardId), { active: false });
+}
+
+// 쿠폰 구매 (학생)
+// 원자적 트랜잭션: 잔액 확인 → 재고 확인 → 잔액 차감 → 재고 차감
+// 트랜잭션 성공 후 쿠폰 발급 + 거래 기록 추가
+export async function purchaseReward(studentName, rewardId, rewardTitle, emoji, price) {
+  const studentRef = doc(db, "students", studentName);
+  const rewardRef = doc(db, "rewards", rewardId);
+
+  await runTransaction(db, async (tx) => {
+    const studentSnap = await tx.get(studentRef);
+    const rewardSnap = await tx.get(rewardRef);
+
+    if (!studentSnap.exists()) throw new Error("학생을 찾을 수 없어요");
+    if (!rewardSnap.exists()) throw new Error("상품을 찾을 수 없어요");
+
+    const balance = studentSnap.data().balance || 0;
+    const reward = rewardSnap.data();
+
+    if (!reward.active) throw new Error("판매가 종료된 상품이에요");
+    if (balance < price) throw new Error("잔고가 부족해요");
+    if (reward.stock !== null && reward.stock <= 0) throw new Error("재고가 없어요");
+
+    // 잔액 차감
+    tx.update(studentRef, { balance: balance - price });
+
+    // 재고 차감 (null이면 무제한이므로 스킵)
+    if (reward.stock !== null) {
+      tx.update(rewardRef, { stock: reward.stock - 1 });
+    }
+  });
+
+  // 쿠폰 발급 (Firestore에 보관)
+  await addDoc(collection(db, "studentCoupons"), {
+    studentName, rewardId, rewardTitle, emoji, price,
+    status: "보유",
+    purchasedAt: serverTimestamp(),
+    usedAt: null,
+  });
+
+  // 거래 내역에도 기록 (me.html 거래 탭에 표시됨)
+  await addDoc(collection(db, "transactions"), {
+    name: studentName,
+    amount: -price,
+    type: "쿠폰구매",
+    memo: `${emoji} ${rewardTitle} 구매`,
+    by: studentName,
+    createdAt: serverTimestamp(),
+  });
+}
+
+// 내 쿠폰 목록 조회 (학생)
+export async function getStudentCoupons(studentName) {
+  const snap = await getDocs(collection(db, "studentCoupons"));
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .filter(d => d.studentName === studentName)
+    .sort((a, b) => (b.purchasedAt?.seconds || 0) - (a.purchasedAt?.seconds || 0));
+}
+
+// 전체 쿠폰 현황 조회 (마스터 관리용)
+export async function getAllCoupons() {
+  const snap = await getDocs(collection(db, "studentCoupons"));
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.purchasedAt?.seconds || 0) - (a.purchasedAt?.seconds || 0));
+}
+
+// 쿠폰 사용 처리 (마스터가 실물 사용 확인 후 처리)
+export async function useCoupon(couponId) {
+  await updateDoc(doc(db, "studentCoupons", couponId), {
+    status: "사용됨",
+    usedAt: serverTimestamp(),
+  });
+}

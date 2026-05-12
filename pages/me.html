@@ -211,7 +211,7 @@
     <button id="refreshBtn" style="background:transparent;border:none;cursor:pointer;font-size:20px;padding:4px;" title="새로고침">🔄</button>
   </div>
 
-  <!-- 탭 (3x2 그리드 — 폰에서도 가로 스크롤 없음) -->
+  <!-- 탭 (3x3 그리드 — 폰에서도 가로 스크롤 없음) -->
   <div class="tab-bar" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">
     <button class="tab-btn active" data-tab="tx">💸 거래</button>
     <button class="tab-btn" data-tab="notice">📢 공지<span class="tab-dot" id="dot-notice"></span></button>
@@ -219,6 +219,7 @@
     <button class="tab-btn" data-tab="mission">🎯 미션<span class="tab-dot" id="dot-mission"></span></button>
     <button class="tab-btn" data-tab="fine">📄 고지서<span class="tab-dot" id="dot-fine"></span></button>
     <button class="tab-btn" data-tab="schedule">📅 일정</button>
+    <button class="tab-btn" data-tab="coupon" style="grid-column:1/-1;">🎁 쿠폰</button>
   </div>
 
   <!-- 거래내역 -->
@@ -276,6 +277,28 @@
     </div>
   </div>
 
+  <!-- 🎁 쿠폰 -->
+  <div id="panel-coupon" style="display:none;">
+
+    <!-- 구매 가능한 보상 목록 -->
+    <div style="font-size:13px;font-weight:700;color:var(--text-dim);margin-bottom:8px;">🏪 구매 가능한 보상</div>
+    <div class="spinner" id="reward-spinner"></div>
+    <div id="rewardShopList"></div>
+    <div class="empty-state" id="reward-shop-empty" style="display:none;">
+      <div class="emoji">🛍️</div>
+      등록된 보상이 없어요
+    </div>
+
+    <!-- 내 쿠폰 보관함 -->
+    <div style="font-size:13px;font-weight:700;color:var(--text-dim);margin:16px 0 8px;">🎫 내 쿠폰 보관함</div>
+    <div class="spinner" id="coupon-spinner"></div>
+    <div id="myCouponList"></div>
+    <div class="empty-state" id="my-coupon-empty" style="display:none;">
+      <div class="emoji">🎫</div>
+      보유한 쿠폰이 없어요
+    </div>
+  </div>
+
   <!-- 국가 일정 -->
   <div id="panel-schedule" style="display:none;">
     <!-- 다가오는 일정 -->
@@ -324,7 +347,7 @@
 
 <script type="module">
   import { requireLogin, clearSession } from "../auth.js";
-  import { getStudentByName, getTransactions, getNotices, confirmNotice, getFines, getNationConfig, getAllStudents, addDiary, getMyDiaries, getWeekDiaryCount, getMissions, applyMission, getMissionApps, getSchedules } from "../db.js";
+  import { getStudentByName, getTransactions, getNotices, confirmNotice, getFines, getNationConfig, getAllStudents, addDiary, getMyDiaries, getWeekDiaryCount, getMissions, applyMission, getMissionApps, getSchedules, getRewards, purchaseReward, getStudentCoupons } from "../db.js";
 
   const session = requireLogin();
   if (!session) throw new Error("로그인 필요");
@@ -525,7 +548,7 @@
       const tab = this.dataset.tab;
       document.querySelectorAll(".tab-btn").forEach(t => t.classList.remove("active"));
       this.classList.add("active");
-      ["tx","notice","fine","diary","mission","schedule"].forEach(t => {
+      ["tx","notice","fine","diary","mission","schedule","coupon"].forEach(t => {
         const el = document.getElementById("panel-" + t);
         if (el) el.style.display = "none";
       });
@@ -536,6 +559,7 @@
       if (tab === "diary") loadDiary();
       if (tab === "mission") loadMissions();
       if (tab === "schedule") loadSchedule();
+      if (tab === "coupon") loadCouponTab();
     });
   });
 
@@ -643,6 +667,110 @@
   }
 
 
+
+  // ── 🎁 쿠폰 탭 ──────────────────────────
+
+  async function loadCouponTab() {
+    // 구매 가능 목록 + 내 쿠폰 동시 로드
+    document.getElementById("reward-spinner").style.display = "block";
+    document.getElementById("coupon-spinner").style.display = "block";
+    document.getElementById("reward-shop-empty").style.display = "none";
+    document.getElementById("my-coupon-empty").style.display = "none";
+
+    const [rewards, myCoupons, student] = await Promise.all([
+      getRewards(),
+      getStudentCoupons(name),
+      getStudentByName(name),
+    ]);
+
+    const myBalance = student?.balance || 0;
+
+    // ── 보상 상품 목록 렌더링
+    document.getElementById("reward-spinner").style.display = "none";
+    if (rewards.length === 0) {
+      document.getElementById("reward-shop-empty").style.display = "block";
+    } else {
+      document.getElementById("rewardShopList").innerHTML = rewards.map(r => {
+        const soldOut = r.stock !== null && r.stock <= 0;
+        const canBuy = !soldOut && myBalance >= r.price;
+        const stockText = r.stock === null
+          ? '<span style="color:var(--accent3);font-size:11px;">무제한</span>'
+          : soldOut
+            ? '<span style="color:var(--accent2);font-size:11px;">품절</span>'
+            : `<span style="color:var(--text-dim);font-size:11px;">잔여 ${r.stock}개</span>`;
+        return `
+          <div class="card" style="margin-bottom:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <div style="font-size:16px;font-weight:800;">${r.emoji || "🎁"} ${r.title}</div>
+              <div style="font-family:'Gmarket Sans',sans-serif;font-size:17px;color:var(--gold);font-weight:700;">${r.price.toLocaleString()}원</div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              ${stockText}
+              <button class="btn btn-sm ${canBuy ? "btn-gold" : "btn-outline"} reward-buy-btn"
+                data-id="${r.id}" data-title="${r.title}" data-emoji="${r.emoji||"🎁"}" data-price="${r.price}"
+                ${soldOut ? "disabled style='opacity:0.4;'" : !canBuy ? "disabled style='opacity:0.5;'" : ""}>
+                ${soldOut ? "품절" : !canBuy ? "잔액 부족" : "구매하기"}
+              </button>
+            </div>
+          </div>`;
+      }).join("");
+
+      // 구매 버튼 이벤트
+      document.querySelectorAll(".reward-buy-btn").forEach(btn => {
+        btn.addEventListener("click", async function() {
+          const { id, title, emoji, price } = this.dataset;
+          const p = Number(price);
+          if (!confirm(`${emoji} ${title}을(를) ${p.toLocaleString()}원에 구매할까요?`)) return;
+          this.disabled = true;
+          this.textContent = "구매 중...";
+          try {
+            await purchaseReward(name, id, title, emoji, p);
+            showToast(`🎁 "${title}" 구매 완료! 쿠폰함에서 확인하세요`);
+            // 잔액 UI 갱신 + 쿠폰탭 새로고침
+            const updated = await getStudentByName(name);
+            document.getElementById("balance").textContent = (updated.balance || 0).toLocaleString() + "원";
+            loadCouponTab();
+          } catch(e) {
+            showToast("오류: " + e.message, true);
+            this.disabled = false;
+            this.textContent = "구매하기";
+          }
+        });
+      });
+    }
+
+    // ── 내 쿠폰 보관함 렌더링
+    document.getElementById("coupon-spinner").style.display = "none";
+    if (myCoupons.length === 0) {
+      document.getElementById("my-coupon-empty").style.display = "block";
+    } else {
+      document.getElementById("myCouponList").innerHTML = myCoupons.map(c => {
+        const date = c.purchasedAt?.toDate
+          ? c.purchasedAt.toDate().toLocaleDateString("ko-KR",{month:"numeric",day:"numeric"})
+          : "";
+        const usedDate = c.usedAt?.toDate
+          ? c.usedAt.toDate().toLocaleDateString("ko-KR",{month:"numeric",day:"numeric"})
+          : "";
+        const isUsed = c.status === "사용됨";
+        return `
+          <div class="card" style="margin-bottom:8px;${isUsed ? "opacity:0.55;" : ""}">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="font-size:15px;font-weight:700;">${c.emoji||"🎁"} ${c.rewardTitle}</div>
+                <div style="font-size:11px;color:var(--text-dim);margin-top:3px;">구매일: ${date} · ${c.price.toLocaleString()}원</div>
+                ${isUsed ? `<div style="font-size:11px;color:var(--text-dim);">사용일: ${usedDate}</div>` : ""}
+              </div>
+              <div style="
+                font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;
+                ${isUsed
+                  ? "background:rgba(255,255,255,0.06);color:var(--text-dim);"
+                  : "background:rgba(105,240,174,0.12);color:var(--accent3);border:1px solid rgba(105,240,174,0.25);"}
+              ">${isUsed ? "사용됨" : "보유중"}</div>
+            </div>
+          </div>`;
+      }).join("");
+    }
+  }
 
   window.doLogout = function() {
     clearSession();

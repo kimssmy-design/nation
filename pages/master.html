@@ -264,6 +264,67 @@
         <button class="btn btn-danger" style="flex:1;" onclick="doMoney(-1)">− 차감</button>
       </div>
     </div>
+
+    <!-- ──────────────────────────────────── -->
+    <!-- 🎁 보상 쿠폰 관리                    -->
+    <!-- ──────────────────────────────────── -->
+
+    <!-- 보상 상품 등록 폼 -->
+    <div class="card" style="margin-top:14px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:12px;">🎁 보상 쿠폰 등록</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div class="input-group" style="margin-bottom:0;">
+          <label>이모지</label>
+          <input type="text" id="rewardEmoji" placeholder="🧹" maxlength="2" style="text-align:center;font-size:18px;">
+        </div>
+        <div class="input-group" style="margin-bottom:0;">
+          <label>가격 (원)</label>
+          <input type="number" id="rewardPrice" placeholder="2000" step="500" min="0">
+        </div>
+      </div>
+      <div class="input-group" style="margin-top:8px;">
+        <label>상품명</label>
+        <input type="text" id="rewardTitle" placeholder="예: 청소면제권">
+      </div>
+      <div class="input-group">
+        <label>수량 제한 <span style="font-size:11px;color:var(--text-dim);">(빈칸 = 무제한)</span></label>
+        <input type="number" id="rewardStock" placeholder="예: 5 (빈칸=무제한)" min="1">
+      </div>
+      <button class="btn btn-gold btn-full" style="margin-top:4px;" onclick="doAddReward()">등록하기</button>
+    </div>
+
+    <!-- 등록된 보상 목록 -->
+    <div class="card" style="margin-top:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div style="font-size:14px;font-weight:700;">📦 등록된 보상 목록</div>
+        <button class="btn btn-outline btn-sm" onclick="loadRewardManage()">🔄 새로고침</button>
+      </div>
+      <div class="spinner" id="reward-manage-spinner"></div>
+      <div id="rewardManageList"></div>
+      <div class="empty-state" id="reward-manage-empty" style="display:none;padding:16px 0;">
+        <div class="emoji">🛍️</div>
+        등록된 보상이 없어요
+      </div>
+    </div>
+
+    <!-- 전체 쿠폰 현황 (사용 처리) -->
+    <div class="card" style="margin-top:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div style="font-size:14px;font-weight:700;">🎫 쿠폰 사용 처리</div>
+        <button class="btn btn-outline btn-sm" onclick="loadCouponManage()">🔄 새로고침</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <button class="btn btn-sm" id="couponFilterAll" onclick="setCouponFilter('all')" style="background:var(--primary);color:white;">전체</button>
+        <button class="btn btn-outline btn-sm" id="couponFilterHold" onclick="setCouponFilter('보유')">보유중</button>
+        <button class="btn btn-outline btn-sm" id="couponFilterUsed" onclick="setCouponFilter('사용됨')">사용됨</button>
+      </div>
+      <div class="spinner" id="coupon-manage-spinner"></div>
+      <div id="couponManageList"></div>
+      <div class="empty-state" id="coupon-manage-empty" style="display:none;padding:16px 0;">
+        <div class="emoji">🎫</div>
+        쿠폰 내역이 없어요
+      </div>
+    </div>
   </div>
 
   <!-- 국가 설정 -->
@@ -400,7 +461,8 @@
     issueFine, getFines, payFine, addMission, getMissions, closeMission,
     getMissionApps, approveMission, rejectMission,
     getMyDiaries, getWeekDiaryCount, getThisWeekDiaries,
-    addSchedule, getSchedules, deleteSchedule
+    addSchedule, getSchedules, deleteSchedule,
+    addReward, getAllRewards, deactivateReward, getAllCoupons, useCoupon
   } from "../db.js";
 
   const session = requireMaster();
@@ -1029,6 +1091,162 @@
       loadScheduleManage();
     } catch(e) {
       showToast("삭제 오류: " + e.message, true);
+    }
+  };
+
+  // ── 🎁 보상 쿠폰 관리 ──────────────────────────
+
+  let _allCoupons = [];       // 전체 쿠폰 캐시
+  let _couponFilter = "all";  // 현재 필터 ("all" | "보유" | "사용됨")
+
+  // 가상화폐 탭 진입 시 자동 로드
+  const _origSwitchTab = window.switchTab;
+  window.switchTab = function(tabName, el) {
+    _origSwitchTab(tabName, el);
+    if (tabName === "money") {
+      loadRewardManage();
+      loadCouponManage();
+    }
+  };
+
+  // 보상 상품 등록
+  window.doAddReward = async function() {
+    const title = document.getElementById("rewardTitle").value.trim();
+    const price = parseInt(document.getElementById("rewardPrice").value) || 0;
+    const emoji = document.getElementById("rewardEmoji").value.trim() || "🎁";
+    const stockVal = document.getElementById("rewardStock").value.trim();
+    const stock = stockVal === "" ? null : parseInt(stockVal);
+
+    if (!title) return showToast("상품명을 입력해주세요", true);
+    if (price <= 0) return showToast("가격을 입력해주세요", true);
+    if (stock !== null && stock < 1) return showToast("수량은 1개 이상이어야 해요", true);
+
+    try {
+      await addReward(title, price, emoji, stock, "마스터");
+      showToast(`✅ "${title}" 등록 완료!`);
+      // 폼 초기화
+      ["rewardTitle","rewardPrice","rewardEmoji","rewardStock"].forEach(id => {
+        document.getElementById(id).value = "";
+      });
+      loadRewardManage();
+    } catch(e) {
+      showToast("등록 오류: " + e.message, true);
+    }
+  };
+
+  // 보상 목록 렌더링
+  window.loadRewardManage = async function() {
+    document.getElementById("reward-manage-spinner").style.display = "block";
+    document.getElementById("reward-manage-empty").style.display = "none";
+    const rewards = await getAllRewards();
+    document.getElementById("reward-manage-spinner").style.display = "none";
+
+    if (rewards.length === 0) {
+      document.getElementById("rewardManageList").innerHTML = "";
+      document.getElementById("reward-manage-empty").style.display = "block";
+      return;
+    }
+    document.getElementById("rewardManageList").innerHTML = rewards.map(r => {
+      const stockText = r.stock === null
+        ? "무제한"
+        : r.stock <= 0
+          ? '<span style="color:var(--accent2);">품절 (0개)</span>'
+          : `잔여 ${r.stock}개`;
+      const activeStyle = r.active
+        ? "background:rgba(105,240,174,0.12);color:var(--accent3);border:1px solid rgba(105,240,174,0.25);"
+        : "background:rgba(255,255,255,0.06);color:var(--text-dim);";
+      return `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--navy-light);">
+          <div>
+            <span style="font-size:14px;font-weight:700;">${r.emoji||"🎁"} ${r.title}</span>
+            <span style="font-size:12px;font-weight:700;padding:2px 8px;border-radius:12px;margin-left:6px;${activeStyle}">${r.active ? "판매중" : "비활성"}</span><br>
+            <span style="font-size:12px;color:var(--gold);font-weight:700;">${r.price.toLocaleString()}원</span>
+            <span style="font-size:11px;color:var(--text-dim);margin-left:8px;">${stockText}</span>
+          </div>
+          ${r.active
+            ? `<button class="btn btn-danger btn-sm" onclick="doDeactivateReward('${r.id}','${r.title}')">숨김</button>`
+            : `<span style="font-size:11px;color:var(--text-dim);">비활성</span>`
+          }
+        </div>`;
+    }).join("");
+  };
+
+  // 보상 비활성화
+  window.doDeactivateReward = async function(id, title) {
+    if (!confirm(`"${title}"을 숨길까요?\n(학생 화면에서 사라지고, 보유 쿠폰은 유지됩니다)`)) return;
+    try {
+      await deactivateReward(id);
+      showToast("🔒 비활성 처리됐어요");
+      loadRewardManage();
+    } catch(e) {
+      showToast("오류: " + e.message, true);
+    }
+  };
+
+  // 쿠폰 현황 로드
+  window.loadCouponManage = async function() {
+    document.getElementById("coupon-manage-spinner").style.display = "block";
+    document.getElementById("coupon-manage-empty").style.display = "none";
+    _allCoupons = await getAllCoupons();
+    document.getElementById("coupon-manage-spinner").style.display = "none";
+    renderCouponManage();
+  };
+
+  // 필터 적용
+  window.setCouponFilter = function(filter) {
+    _couponFilter = filter;
+    ["all","hold","used"].forEach(f => {
+      document.getElementById("couponFilter" + f.charAt(0).toUpperCase() + f.slice(1))
+        ?.classList.toggle("btn-outline", f !== filter);
+    });
+    renderCouponManage();
+  };
+
+  function renderCouponManage() {
+    const filtered = _couponFilter === "all"
+      ? _allCoupons
+      : _allCoupons.filter(c => c.status === _couponFilter);
+
+    if (filtered.length === 0) {
+      document.getElementById("couponManageList").innerHTML = "";
+      document.getElementById("coupon-manage-empty").style.display = "block";
+      return;
+    }
+    document.getElementById("coupon-manage-empty").style.display = "none";
+    document.getElementById("couponManageList").innerHTML = filtered.map(c => {
+      const date = c.purchasedAt?.toDate
+        ? c.purchasedAt.toDate().toLocaleDateString("ko-KR",{month:"numeric",day:"numeric"})
+        : "";
+      const usedDate = c.usedAt?.toDate
+        ? c.usedAt.toDate().toLocaleDateString("ko-KR",{month:"numeric",day:"numeric"})
+        : "";
+      const isUsed = c.status === "사용됨";
+      return `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--navy-light);${isUsed ? "opacity:0.55;" : ""}">
+          <div>
+            <div style="font-size:13px;font-weight:700;">${c.emoji||"🎁"} ${c.rewardTitle}</div>
+            <div style="font-size:11px;color:var(--text-dim);">
+              학생: <strong>${c.studentName}</strong> · 구매일: ${date} · ${c.price.toLocaleString()}원
+              ${isUsed ? ` · 사용일: ${usedDate}` : ""}
+            </div>
+          </div>
+          ${isUsed
+            ? `<span style="font-size:12px;color:var(--text-dim);padding:3px 10px;border-radius:12px;background:rgba(255,255,255,0.06);">사용됨</span>`
+            : `<button class="btn btn-sm btn-gold" onclick="doUseCoupon('${c.id}','${c.studentName}','${c.rewardTitle}')">사용처리</button>`
+          }
+        </div>`;
+    }).join("");
+  }
+
+  // 쿠폰 사용 처리
+  window.doUseCoupon = async function(couponId, studentName, rewardTitle) {
+    if (!confirm(`${studentName}의 "${rewardTitle}" 쿠폰을 사용 처리할까요?`)) return;
+    try {
+      await useCoupon(couponId);
+      showToast(`✅ ${studentName}의 "${rewardTitle}" 사용 처리 완료!`);
+      loadCouponManage();
+    } catch(e) {
+      showToast("오류: " + e.message, true);
     }
   };
 
