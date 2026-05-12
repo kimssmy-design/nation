@@ -211,18 +211,6 @@
     <button id="refreshBtn" style="background:transparent;border:none;cursor:pointer;font-size:20px;padding:4px;" title="새로고침">🔄</button>
   </div>
 
-  <!-- 청약 진행바 -->
-  <div id="savingBar" style="display:none;background:var(--card);border:1px solid var(--navy-light);border-radius:12px;padding:12px 16px;margin-bottom:12px;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-      <div style="font-size:12px;font-weight:700;color:var(--text-dim);">🏠 청약 목표</div>
-      <div style="font-size:12px;color:var(--gold);font-weight:700;" id="savingText">0 / 5,000원</div>
-    </div>
-    <div style="background:var(--navy-mid);border-radius:4px;height:8px;overflow:hidden;">
-      <div id="savingFill" style="height:100%;background:linear-gradient(to right,var(--gold),var(--accent));border-radius:4px;transition:width 0.5s;width:0%;"></div>
-    </div>
-    <div style="font-size:11px;color:var(--text-dim);margin-top:4px;" id="savingMsg"></div>
-  </div>
-
   <!-- 탭 (3x2 그리드 — 폰에서도 가로 스크롤 없음) -->
   <div class="tab-bar" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">
     <button class="tab-btn active" data-tab="tx">💸 거래</button>
@@ -569,21 +557,6 @@
       btn.textContent = "확인";
     }
   };
-
-  // 청약 진행바
-  function updateSavingBar(balance) {
-    const goal = 5000;
-    const pct = Math.min(Math.round(balance / goal * 100), 100);
-    document.getElementById("savingBar").style.display = "block";
-    document.getElementById("savingFill").style.width = pct + "%";
-    document.getElementById("savingText").textContent = `${balance.toLocaleString()} / ${goal.toLocaleString()}원`;
-    if (balance >= goal) {
-      document.getElementById("savingMsg").textContent = "✅ 청약 신청 가능해요!";
-      document.getElementById("savingMsg").style.color = "var(--accent3)";
-    } else {
-      document.getElementById("savingMsg").textContent = `${(goal - balance).toLocaleString()}원 더 모으면 청약 신청 가능!`;
-    }
-  }
 
   // 시민일지
   async function loadDiary() {
