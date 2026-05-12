@@ -9,32 +9,65 @@
 .me-wrap { max-width: 480px; margin: 0 auto; padding: 16px; }
 
 .me-profile {
-  background: linear-gradient(135deg, var(--navy-mid), var(--navy-light));
-  border: 1px solid var(--navy-light);
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: 16px;
-  padding: 20px;
+  padding: 16px;
   margin-bottom: 14px;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
 .me-avatar {
-  width: 52px; height: 52px;
-  background: var(--gold);
+  width: 44px; height: 44px;
+  background: var(--primary);
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  font-size: 20px; font-weight: 900; color: var(--navy);
+  font-size: 18px; font-weight: 800; color: white;
   flex-shrink: 0;
 }
-.me-info h2 { font-size: 18px; font-weight: 900; margin-bottom: 4px; }
-.me-info .role { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
-
-.me-balance { text-align: right; margin-left: auto; }
-.me-balance .amount {
-  font-family: 'Gmarket Sans', sans-serif;
-  font-size: 26px; font-weight: 700; color: var(--gold);
+.me-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
 }
-.me-balance .label { font-size: 11px; color: var(--text-dim); }
+.me-info h2 {
+  font-size: 16px;
+  font-weight: 800;
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+.me-info .role { font-size: 11px; color: var(--text-dim); margin-top: 3px; }
+
+.me-balance {
+  text-align: right;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.me-balance .amount {
+  font-family: 'Pretendard', sans-serif;
+  font-size: 22px; font-weight: 800; color: var(--text);
+  line-height: 1.1;
+}
+.me-balance .label { font-size: 10px; color: var(--text-dim); margin-top: 2px; }
+
+#refreshBtn {
+  flex-shrink: 0;
+  font-size: 18px !important;
+}
+
+/* 폰에서 더 컴팩트 */
+@media (max-width: 380px) {
+  .me-profile { padding: 14px; gap: 10px; }
+  .me-avatar { width: 40px; height: 40px; font-size: 16px; }
+  .me-info h2 { font-size: 15px; }
+  .me-balance .amount { font-size: 19px; }
+  #refreshBtn { font-size: 16px !important; }
+}
 
 /* 공지 */
 .notice-item {
