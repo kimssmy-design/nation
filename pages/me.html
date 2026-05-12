@@ -354,7 +354,6 @@
     document.getElementById("studentRole").innerHTML = `<span class="badge badge-blue">${student.role}</span>`;
     document.getElementById("balance").textContent = (student.balance || 0).toLocaleString() + "원";
     window._stockKey = student.stockKey || "";
-    updateSavingBar(student.balance || 0);
 
     // 내 랭킹 계산
     const { getAllStudents } = await import("../db.js");
