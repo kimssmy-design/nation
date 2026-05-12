@@ -3,469 +3,298 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>선영국가 현황판</title>
-<link href="https://fonts.googleapis.com/css2?family=Gmarket+Sans:wght@300;500;700&family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+<title>현황판 — 선영국가</title>
+<link rel="stylesheet" href="../style.css">
 <style>
-:root {
-  --gold: #FFD700;
-  --navy: #0A1628;
-  --navy-mid: #112240;
-  --navy-light: #1C3461;
-  --accent: #4FC3F7;
-  --accent2: #FF6B6B;
-  --accent3: #69F0AE;
-  --text: #E8EAF6;
-  --text-dim: #8892B0;
-  --card: #13213d;
-}
-* { margin:0; padding:0; box-sizing:border-box; }
-body {
-  background: var(--navy);
-  color: var(--text);
-  font-family: 'Noto Sans KR', sans-serif;
-  height: 100vh;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
+.dash-wrap { max-width: 700px; margin: 0 auto; padding: 16px; }
 
-/* 헤더 */
-.header {
-  background: linear-gradient(135deg, var(--navy-mid), var(--navy-light));
-  border-bottom: 2px solid var(--gold);
-  padding: 12px 28px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-shrink: 0;
-}
-.logo {
-  font-family: 'Gmarket Sans', sans-serif;
-  font-size: 26px; font-weight: 700;
-  color: var(--gold);
-  text-shadow: 0 0 20px rgba(255,215,0,0.4);
-}
-.logo span { font-size: 13px; font-weight: 300; color: var(--text-dim); display: block; letter-spacing: 2px; }
-.live-badge {
-  background: var(--accent2); color: white;
-  font-size: 11px; font-weight: 700;
-  padding: 3px 10px; border-radius: 20px; letter-spacing: 1px;
-  animation: pulse 2s infinite;
-}
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
-.header-right { text-align: right; }
-.date-time { font-size: 20px; font-weight: 700; color: var(--gold); font-family: 'Gmarket Sans', sans-serif; }
-.date-sub { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
-
-/* 슬라이드 인디케이터 */
-.slide-indicator {
-  display: flex; justify-content: center;
-  gap: 8px; padding: 8px; flex-shrink: 0;
-}
-.dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: var(--navy-light); transition: all 0.3s; cursor: pointer;
-}
-.dot.active { background: var(--gold); width: 24px; border-radius: 4px; }
-
-/* 슬라이드 */
-.slides-wrapper { flex: 1; overflow: hidden; position: relative; }
-.slide {
-  position: absolute; top:0; left:0; width:100%; height:100%;
-  padding: 16px 24px;
-  display: none; flex-direction: column; gap: 14px;
-  opacity: 0; transition: opacity 0.5s;
-}
-.slide.active { display: flex; opacity: 1; }
-.slide-title {
-  font-size: 13px; font-weight: 700; letter-spacing: 3px;
-  color: var(--text-dim); display: flex; align-items: center; gap: 8px;
-}
-.slide-title::after {
-  content:''; flex:1; height:1px;
-  background: linear-gradient(to right, var(--navy-light), transparent);
-}
-
-/* 통계 카드 */
+/* 통계 카드 그리드 */
 .stats-grid {
-  display: grid; grid-template-columns: repeat(4, 1fr);
-  gap: 12px; flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 18px;
+}
+@media (max-width: 480px) {
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
 }
 .stat-card {
-  background: var(--navy-mid); border: 1px solid var(--navy-light);
-  border-radius: 12px; padding: 16px; text-align: center;
-  position: relative; overflow: hidden;
-}
-.stat-card::before { content:''; position:absolute; top:0;left:0;right:0; height:3px; }
-.stat-card.gold::before { background: var(--gold); }
-.stat-card.blue::before { background: var(--accent); }
-.stat-card.green::before { background: var(--accent3); }
-.stat-card.red::before { background: var(--accent2); }
-.stat-icon { font-size: 22px; margin-bottom: 6px; }
-.stat-label { font-size: 11px; color: var(--text-dim); letter-spacing: 1px; margin-bottom: 4px; }
-.stat-value { font-size: 22px; font-weight: 900; font-family: 'Gmarket Sans', sans-serif; }
-.stat-card.gold .stat-value { color: var(--gold); }
-.stat-card.blue .stat-value { color: var(--accent); }
-.stat-card.green .stat-value { color: var(--accent3); }
-.stat-card.red .stat-value { color: var(--accent2); }
-.stat-unit { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
-
-/* 랭킹 */
-.ranking-section { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; flex: 1; }
-.rank-card {
-  background: var(--navy-mid); border: 1px solid var(--navy-light);
-  border-radius: 12px; padding: 14px;
-  display: flex; flex-direction: column; gap: 8px;
-}
-.rank-card-title {
-  font-size: 12px; font-weight: 700; color: var(--text-dim);
-  letter-spacing: 1px; padding-bottom: 8px;
-  border-bottom: 1px solid var(--navy-light);
-}
-.rank-item { display: flex; align-items: center; gap: 10px; }
-.rank-num {
-  width: 22px; height: 22px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 900; flex-shrink: 0;
-}
-.rank-num.r1 { background: var(--gold); color: var(--navy); }
-.rank-num.r2 { background: #C0C0C0; color: var(--navy); }
-.rank-num.r3 { background: #CD7F32; color: white; }
-.rank-num.r4, .rank-num.r5 { background: var(--navy-light); color: var(--text-dim); }
-.rank-name { font-size: 14px; font-weight: 700; flex: 1; }
-.rank-amount { font-size: 13px; color: var(--gold); font-weight: 700; font-family: 'Gmarket Sans', sans-serif; }
-
-/* 공지 */
-.notice-list { display: flex; flex-direction: column; gap: 10px; flex: 1; }
-.notice-item {
-  background: var(--navy-mid); border: 1px solid var(--navy-light);
-  border-left: 4px solid var(--gold); border-radius: 8px;
-  padding: 14px 18px; display: flex; align-items: flex-start; gap: 14px;
-}
-.notice-item.urgent { border-left-color: var(--accent2); }
-.notice-item.info { border-left-color: var(--accent); }
-.notice-badge {
-  font-size: 10px; font-weight: 700; padding: 3px 8px;
-  border-radius: 4px; letter-spacing: 1px; flex-shrink: 0; margin-top: 2px;
-}
-.notice-item .notice-badge { background: rgba(255,215,0,0.15); color: var(--gold); }
-.notice-item.urgent .notice-badge { background: rgba(255,107,107,0.15); color: var(--accent2); }
-.notice-item.info .notice-badge { background: rgba(79,195,247,0.15); color: var(--accent); }
-.notice-content { flex: 1; }
-.notice-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
-.notice-desc { font-size: 12px; color: var(--text-dim); line-height: 1.5; }
-.notice-date { font-size: 11px; color: var(--text-dim); flex-shrink: 0; margin-top: 2px; }
-
-/* 신고 현황 */
-.report-list { display: flex; flex-direction: column; gap: 10px; flex: 1; }
-.report-item {
-  background: var(--navy-mid); border: 1px solid var(--navy-light);
-  border-radius: 10px; padding: 14px 18px;
-  display: flex; align-items: center; gap: 14px;
-}
-.report-status {
-  font-size: 10px; font-weight: 700; padding: 4px 10px;
-  border-radius: 20px; letter-spacing: 1px; flex-shrink: 0;
-}
-.status-pending { background: rgba(255,215,0,0.15); color: var(--gold); }
-.status-process { background: rgba(79,195,247,0.15); color: var(--accent); }
-.status-done { background: rgba(105,240,174,0.15); color: var(--accent3); }
-.report-content { flex: 1; }
-.report-title { font-size: 14px; font-weight: 700; margin-bottom: 3px; }
-.report-desc { font-size: 12px; color: var(--text-dim); }
-.report-date { font-size: 11px; color: var(--text-dim); flex-shrink: 0; }
-
-/* 매점 상태 배너 */
-.shop-banner {
-  padding: 8px 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 8px;
   text-align: center;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+}
+.stat-icon { font-size: 22px; margin-bottom: 6px; filter: saturate(1.1); }
+.stat-label { font-size: 11px; color: var(--text-dim); margin-bottom: 4px; font-weight: 600; }
+.stat-value {
+  font-size: 18px; font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+
+/* 섹션 타이틀 */
+.section-title {
+  font-size: 13px; font-weight: 800;
+  color: var(--text);
+  margin: 18px 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 보유금 순위 */
+.rank-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 6px;
+}
+.rank-num {
+  font-weight: 800;
+  font-size: 15px;
+  min-width: 30px;
+  text-align: center;
+  color: var(--text-dim);
+}
+.rank-num.medal { font-size: 20px; color: inherit; }
+.rank-name {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rank-amount {
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+/* 신고 카드 */
+.report-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 6px;
+}
+.report-info { flex: 1; min-width: 0; }
+.report-title {
   font-size: 13px; font-weight: 700;
-  flex-shrink: 0;
+  margin-bottom: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.shop-banner.open { background: rgba(105,240,174,0.1); color: var(--accent3); border-top: 1px solid rgba(105,240,174,0.2); }
-.shop-banner.closed { background: rgba(255,107,107,0.05); color: var(--text-dim); border-top: 1px solid rgba(255,255,255,0.05); }
+.report-meta { font-size: 11px; color: var(--text-dim); }
 
-/* 티커 */
-.ticker {
-  background: var(--navy-mid); border-top: 1px solid var(--navy-light);
-  padding: 8px 24px; display: flex; align-items: center; gap: 14px;
-  overflow: hidden; flex-shrink: 0;
+/* 마지막 업데이트 */
+.last-updated {
+  font-size: 11px;
+  color: var(--text-soft);
+  text-align: center;
+  margin: 18px 0 4px;
 }
-.ticker-label {
-  background: var(--gold); color: var(--navy);
-  font-size: 11px; font-weight: 900; padding: 3px 10px;
-  border-radius: 4px; letter-spacing: 1px; flex-shrink: 0;
+.refresh-indicator {
+  display: inline-block;
+  width: 6px; height: 6px;
+  background: var(--success);
+  border-radius: 50%;
+  margin-right: 4px;
+  animation: pulse-green 2s infinite;
 }
-.ticker-text {
-  font-size: 13px; color: var(--text-dim); white-space: nowrap;
-  animation: ticker 25s linear infinite;
+@keyframes pulse-green {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
 }
-@keyframes ticker { 0%{transform:translateX(100vw)} 100%{transform:translateX(-100%)} }
-
-/* 빈 상태 */
-.empty-kiosk { text-align:center; padding: 30px; color: var(--text-dim); font-size:13px; }
 </style>
 </head>
 <body>
+<div class="app-header">
+  <div class="app-logo">📊 현황판<span id="dateLabel"></span></div>
+  <button class="btn btn-outline btn-sm" id="refreshBtn">🔄</button>
+</div>
 
-<div class="header">
-  <div>
-    <div class="logo" id="kiosk-nation-name">🏛️ 선영국가
-      <span id="kiosk-class-name">CLASS 3-X</span>
+<div class="dash-wrap has-bottom-nav">
+  <!-- 통계 카드 4개 -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon">👥</div>
+      <div class="stat-label">전체 학생</div>
+      <div class="stat-value" id="stat-students">-</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">💰</div>
+      <div class="stat-label">총 통화량</div>
+      <div class="stat-value" id="stat-money">-</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🚨</div>
+      <div class="stat-label">진행 신고</div>
+      <div class="stat-value" id="stat-active">-</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">✅</div>
+      <div class="stat-label">완료 신고</div>
+      <div class="stat-value" id="stat-done">-</div>
     </div>
   </div>
-  <div style="display:flex;align-items:center;gap:12px;">
-    <div class="live-badge">● LIVE</div>
-    <div class="header-right">
-      <div class="date-time" id="clock">00:00:00</div>
-      <div class="date-sub" id="dateStr"></div>
-    </div>
-    <a href="me.html" style="background:transparent;border:1px solid rgba(255,215,0,0.4);color:var(--gold);padding:5px 12px;border-radius:8px;font-size:12px;text-decoration:none;font-family:'Noto Sans KR',sans-serif;">← 돌아가기</a>
+
+  <!-- 보유금 TOP 5 -->
+  <div class="section-title">💰 보유금 TOP 5</div>
+  <div id="rankList">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- 진행 중인 신고 -->
+  <div class="section-title">🚨 진행 중인 신고</div>
+  <div id="reportList">
+    <div class="spinner"></div>
+  </div>
+
+  <div class="last-updated">
+    <span class="refresh-indicator"></span>
+    <span id="lastUpdated">자동 갱신: 1분</span>
   </div>
 </div>
 
-<div class="slide-indicator">
-  <div class="dot active" onclick="goSlide(0)"></div>
-  <div class="dot" onclick="goSlide(1)"></div>
-  <div class="dot" onclick="goSlide(2)"></div>
-</div>
-
-<div class="slides-wrapper">
-
-  <!-- 슬라이드 1: 국가 현황 + 랭킹 -->
-  <div class="slide active" id="slide-0">
-    <div class="slide-title">📊 국가 경제 현황</div>
-    <div class="stats-grid">
-      <div class="stat-card gold">
-        <div class="stat-icon">💰</div>
-        <div class="stat-label">총 통화량</div>
-        <div class="stat-value" id="stat-total">-</div>
-        <div class="stat-unit">원</div>
-      </div>
-      <div class="stat-card blue">
-        <div class="stat-icon">👥</div>
-        <div class="stat-label">참여 국민</div>
-        <div class="stat-value" id="stat-count">-</div>
-        <div class="stat-unit">명</div>
-      </div>
-      <div class="stat-card green">
-        <div class="stat-icon">📈</div>
-        <div class="stat-label">평균 자산</div>
-        <div class="stat-value" id="stat-avg">-</div>
-        <div class="stat-unit">원/인</div>
-      </div>
-      <div class="stat-card red">
-        <div class="stat-icon">🛒</div>
-        <div class="stat-label">매점 상태</div>
-        <div class="stat-value" id="stat-shop" style="font-size:16px;">-</div>
-        <div class="stat-unit" id="stat-shop-label"></div>
-      </div>
-    </div>
-    <div class="ranking-section">
-      <div class="rank-card">
-        <div class="rank-card-title">💎 자산 랭킹 TOP5</div>
-        <div id="rank-money"><div style="text-align:center;padding:10px;color:var(--text-dim);font-size:12px;">로딩중...</div></div>
-      </div>
-      <div class="rank-card">
-        <div class="rank-card-title">🌟 칭찬쿠폰 랭킹 TOP5</div>
-        <div id="rank-coupon"><div style="text-align:center;padding:10px;color:var(--text-dim);font-size:12px;">로딩중...</div></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 슬라이드 2: 공지 -->
-  <div class="slide" id="slide-1">
-    <div class="slide-title">📢 국가 공지</div>
-    <div class="notice-list" id="kiosk-notices">
-      <div class="empty-kiosk">로딩중...</div>
-    </div>
-  </div>
-
-  <!-- 슬라이드 3: 신고 현황 -->
-  <div class="slide" id="slide-2">
-    <div class="slide-title">🚨 신고 · 처리 현황</div>
-    <div class="report-list" id="kiosk-reports">
-      <div class="empty-kiosk">로딩중...</div>
-    </div>
-  </div>
-
-</div>
-
-<!-- 매점 배너 -->
-<div class="shop-banner closed" id="shop-banner">🔒 매점 닫힘</div>
-
-<!-- 티커 -->
-<div class="ticker">
-  <div class="ticker-label">속보</div>
-  <div class="ticker-text" id="ticker-text">선영국가 현황판에 오신 것을 환영합니다!</div>
-</div>
+<!-- 하단 네비 -->
+<nav class="bottom-nav">
+  <a href="me.html"><span class="icon">👤</span>내정보</a>
+  <a href="report.html"><span class="icon">🚨</span>신고</a>
+  <a href="shop.html"><span class="icon">🛒</span>매점</a>
+  <a href="#" onclick="openStock()"><span class="icon">📈</span>주식</a>
+  <a href="kiosk.html" class="active"><span class="icon">📊</span>현황판</a>
+</nav>
 
 <script type="module">
-  import { getAllStudents, getNotices, getPublicReports, getNationConfig } from "../db.js";
+  import { requireLogin } from "../auth.js";
+  import { getAllStudents, getAllReports, getStudentByName } from "../db.js";
 
-  // ── 시계
-  function updateClock() {
-    const now = new Date();
-    const h = String(now.getHours()).padStart(2,'0');
-    const m = String(now.getMinutes()).padStart(2,'0');
-    const s = String(now.getSeconds()).padStart(2,'0');
-    document.getElementById('clock').textContent = `${h}:${m}:${s}`;
-    const days = ['일','월','화','수','목','금','토'];
-    document.getElementById('dateStr').textContent =
-      `${now.getFullYear()}년 ${now.getMonth()+1}월 ${now.getDate()}일 ${days[now.getDay()]}요일`;
+  const session = requireLogin();
+  if (!session) throw new Error("로그인 필요");
+
+  // 학생이면 주식키 로드 (마스터는 미사용)
+  if (session.role !== "마스터") {
+    getStudentByName(session.name).then(s => { window._stockKey = s?.stockKey || ""; });
   }
-  setInterval(updateClock, 1000);
-  updateClock();
 
-  // ── 슬라이드
-  let current = 0;
-  const total = 3;
-  const dots = document.querySelectorAll('.dot');
+  const escape = str => (str || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 
-  window.goSlide = function(n) {
-    document.getElementById(`slide-${current}`).classList.remove('active');
-    dots[current].classList.remove('active');
-    current = n;
-    document.getElementById(`slide-${current}`).classList.add('active');
-    dots[current].classList.add('active');
-  };
-  setInterval(() => goSlide((current + 1) % total), 7000);
+  function updateDate() {
+    const now = new Date();
+    const days = ["일","월","화","수","목","금","토"];
+    const dateStr = `${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,"0")}.${String(now.getDate()).padStart(2,"0")} (${days[now.getDay()]})`;
+    document.getElementById("dateLabel").textContent = dateStr;
+  }
 
-  // ── 데이터 로드
-  async function loadAll() {
+  async function loadDashboard() {
     try {
-      const [students, notices, reports, config] = await Promise.all([
-        getAllStudents(), getNotices(), getPublicReports(), getNationConfig()
+      const [students, reports] = await Promise.all([
+        getAllStudents(),
+        getAllReports()
       ]);
-
-      // 국가 이름
-      if (config?.name) document.getElementById('kiosk-nation-name').innerHTML =
-        `🏛️ ${config.name}<span style="font-size:13px;font-weight:300;color:var(--text-dim);display:block;letter-spacing:2px;">${config.className || ""}</span>`;
-
-      // 매점 상태
-      const shopOpen = config?.shopOpen;
-      const shopBanner = document.getElementById('shop-banner');
-      const statShop = document.getElementById('stat-shop');
-      const statShopLabel = document.getElementById('stat-shop-label');
-      if (shopOpen) {
-        shopBanner.className = 'shop-banner open';
-        shopBanner.textContent = '🟢 매점 영업중!';
-        statShop.textContent = '🟢';
-        statShopLabel.textContent = '영업중';
-      } else {
-        shopBanner.className = 'shop-banner closed';
-        shopBanner.textContent = '🔒 매점 닫힘';
-        statShop.textContent = '🔒';
-        statShopLabel.textContent = '닫힘';
-      }
 
       // 테스터 제외
       const realStudents = students.filter(s => s.role !== "테스터");
 
-      // 통계
-      const total = realStudents.reduce((s, st) => s + (st.balance || 0), 0);
-      const avg = realStudents.length > 0 ? Math.round(total / realStudents.length) : 0;
-      document.getElementById('stat-total').textContent = total.toLocaleString();
-      document.getElementById('stat-count').textContent = realStudents.length;
-      document.getElementById('stat-avg').textContent = avg.toLocaleString();
+      // 통계 카드
+      const totalMoney = realStudents.reduce((s, st) => s + (st.balance || 0), 0);
+      const activeReports = reports.filter(r => r.status === "접수됨" || r.status === "조사중");
+      const doneReports = reports.filter(r => r.status === "처리완료");
 
-      // 자산 랭킹
-      const rankNums = ['r1','r2','r3','r4','r5'];
-      const sorted = [...realStudents].sort((a,b) => (b.balance||0) - (a.balance||0)).slice(0,5);
-      document.getElementById('rank-money').innerHTML = sorted.length > 0
-        ? sorted.map((s,i) => `
-            <div class="rank-item">
-              <div class="rank-num ${rankNums[i]}">${i+1}</div>
-              <div class="rank-name">${s.name}</div>
-              <div class="rank-amount">${(s.balance||0).toLocaleString()}원</div>
-            </div>`).join("")
-        : `<div class="empty-kiosk">데이터 없음</div>`;
+      document.getElementById("stat-students").textContent = realStudents.length + "명";
+      document.getElementById("stat-money").textContent = totalMoney.toLocaleString();
+      document.getElementById("stat-active").textContent = activeReports.length + "건";
+      document.getElementById("stat-done").textContent = doneReports.length + "건";
 
-      // 칭찬쿠폰 랭킹
-      const sortedCoupon = [...students].sort((a,b) => (b.couponCount||0) - (a.couponCount||0)).slice(0,5);
-      document.getElementById('rank-coupon').innerHTML = sortedCoupon.length > 0
-        ? sortedCoupon.map((s,i) => `
-            <div class="rank-item">
-              <div class="rank-num ${rankNums[i]}">${i+1}</div>
-              <div class="rank-name">${s.name}</div>
-              <div class="rank-amount">${s.couponCount||0}장</div>
-            </div>`).join("")
-        : `<div class="empty-kiosk">데이터 없음</div>`;
+      // 보유금 TOP 5
+      const top5 = [...realStudents]
+        .sort((a, b) => (b.balance || 0) - (a.balance || 0))
+        .slice(0, 5);
 
-      // 공지
-      if (notices.length === 0) {
-        document.getElementById('kiosk-notices').innerHTML = `<div class="empty-kiosk">등록된 공지가 없어요</div>`;
+      if (top5.length === 0) {
+        document.getElementById("rankList").innerHTML = `<div class="empty-state"><div class="emoji">💰</div>등록된 학생이 없어요</div>`;
       } else {
-        document.getElementById('kiosk-notices').innerHTML = notices.slice(0,4).map(n => {
-          const date = n.createdAt?.toDate ? n.createdAt.toDate().toLocaleDateString("ko-KR",{month:"numeric",day:"numeric"}) : "";
-          return `
-            <div class="notice-item info">
-              <div class="notice-badge">공지</div>
-              <div class="notice-content">
-                <div class="notice-title">${n.title}</div>
-                <div class="notice-desc">${n.content}</div>
-              </div>
-              <div class="notice-date">${date}</div>
-            </div>`;
+        document.getElementById("rankList").innerHTML = top5.map((s, idx) => {
+          const medals = ["🥇","🥈","🥉"];
+          const isMedal = idx < 3;
+          return `<div class="rank-item">
+            <span class="rank-num ${isMedal ? "medal" : ""}">${isMedal ? medals[idx] : (idx+1)}</span>
+            <span class="rank-name">${escape(s.name)}</span>
+            <span class="rank-amount">${(s.balance || 0).toLocaleString()}원</span>
+          </div>`;
         }).join("");
       }
 
-      // 신고 현황
-      const statusClass = { "접수됨":"status-pending", "조사중":"status-process", "처리완료":"status-done" };
-      if (reports.length === 0) {
-        document.getElementById('kiosk-reports').innerHTML = `<div class="empty-kiosk">접수된 신고가 없어요 ✅</div>`;
+      // 진행 중인 신고 (최신순)
+      const activeSorted = [...activeReports].sort((a, b) =>
+        (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
+      );
+
+      if (activeSorted.length === 0) {
+        document.getElementById("reportList").innerHTML = `<div class="empty-state"><div class="emoji">✅</div>진행 중인 신고가 없어요</div>`;
       } else {
-        document.getElementById('kiosk-reports').innerHTML = reports.slice(0,4).map(r => {
-          const date = r.createdAt?.toDate ? r.createdAt.toDate().toLocaleDateString("ko-KR",{month:"numeric",day:"numeric"}) : "";
-          return `
-            <div class="report-item">
-              <div class="report-status ${statusClass[r.status]||''}">${r.status}</div>
-              <div class="report-content">
-                <div class="report-title">${r.type}</div>
-                <div class="report-desc">${r.result || r.content || ""}</div>
-              </div>
-              <div class="report-date">${date}</div>
-            </div>`;
+        document.getElementById("reportList").innerHTML = activeSorted.map(r => {
+          const date = r.createdAt?.toDate
+            ? r.createdAt.toDate().toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" })
+            : "";
+          const badgeClass = r.status === "접수됨" ? "badge-gold" : "badge-blue";
+          return `<div class="report-item">
+            <div class="report-info">
+              <div class="report-title">${escape(r.type)}</div>
+              <div class="report-meta">${date} · 신고자: 익명</div>
+            </div>
+            <span class="badge ${badgeClass}">${r.status}</span>
+          </div>`;
         }).join("");
       }
 
-      // 최근 거래에서 이벤트 속보 생성
-      const { getDocs, collection } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-      const { db } = await import("../firebase.js");
-      const txSnap = await getDocs(collection(db, "transactions"));
-      const recentTxs = txSnap.docs
-        .map(d => d.data())
-        .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0))
-        .slice(0, 20);
-
-      const newsItems = recentTxs
-        .filter(tx => ["이벤트","칭찬쿠폰","주급","로또"].includes(tx.type))
-        .slice(0, 5)
-        .map(tx => {
-          const icon = tx.type === "이벤트" ? "🎉" : tx.type === "칭찬쿠폰" ? "🌟" : tx.type === "주급" ? "💰" : "🎟️";
-          return `${icon} ${tx.name} +${(tx.amount||0).toLocaleString()}원 (${tx.memo||tx.type})`;
-        });
-
-      // 티커
-      const top1 = sorted[0];
-      const tickerParts = [
-        top1 ? `🏆 자산 1위: ${top1.name} (${(top1.balance||0).toLocaleString()}원)` : "",
-        ...newsItems,
-        `👥 참여 국민: ${realStudents.length}명`,
-        `💰 총 통화량: ${total.toLocaleString()}원`,
-        shopOpen ? "🟢 매점 지금 영업중입니다!" : "🔒 매점은 수요일 종례 후 오픈합니다",
-        notices[0] ? `📢 최신 공지: ${notices[0].title}` : "",
-      ].filter(Boolean).join("  ·  ");
-      document.getElementById('ticker-text').textContent = tickerParts;
-
-    } catch(e) {
-      console.error("데이터 로드 오류:", e);
+      // 갱신 시각
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2, "0");
+      const mm = String(now.getMinutes()).padStart(2, "0");
+      document.getElementById("lastUpdated").textContent = `마지막 갱신: ${hh}:${mm} · 1분마다 자동 새로고침`;
+    } catch (e) {
+      console.warn("현황판 로드 실패:", e);
     }
   }
 
-  loadAll();
-  // 3분마다 자동 갱신
-  setInterval(loadAll, 180000);
+  // 수동 새로고침 버튼
+  document.getElementById("refreshBtn").addEventListener("click", () => {
+    const btn = document.getElementById("refreshBtn");
+    btn.textContent = "⏳";
+    loadDashboard().then(() => {
+      setTimeout(() => { btn.textContent = "🔄"; }, 400);
+    });
+  });
+
+  // 초기 로드 + 1분마다 자동 새로고침
+  updateDate();
+  loadDashboard();
+  setInterval(updateDate, 60 * 1000);
+  setInterval(loadDashboard, 60 * 1000);
+
+  // 주식 링크 (me.html과 동일)
+  window.openStock = function() {
+    if (window._stockKey) {
+      window.open(`https://sub-teacher.com/API/stock/student.html?key=${window._stockKey}`, "_blank");
+    } else {
+      alert("선생님께 반짝모의투자 등록을 부탁하세요 📈");
+    }
+  };
 </script>
 </body>
 </html>

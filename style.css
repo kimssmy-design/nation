@@ -272,9 +272,9 @@ body {
 .bottom-nav a .icon { font-size: 22px; }
 .bottom-nav a.active { color: var(--primary); }
 
-/* 하단 네비 여백 — 모바일 크롬 잘림 방지 (홈인디케이터·주소창 영역까지 고려) */
+/* 하단 네비 여백 — 모바일 크롬 동적 주소창·홈인디케이터 잘림 방지 */
 .has-bottom-nav {
-  padding-bottom: calc(80px + env(safe-area-inset-bottom));
+  padding-bottom: calc(110px + env(safe-area-inset-bottom));
 }
 
 /* ── 로딩 스피너 ── */
