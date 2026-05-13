@@ -16,6 +16,60 @@ export async function setNationConfig(data) {
   await setDoc(doc(db, "config", "nation"), data, { merge: true });
 }
 
+// ── 세금 설정 ──
+// 전체 학생 동일 세금 금액을 config에 저장
+export async function setTaxRate(amount) {
+  await setDoc(doc(db, "config", "nation"), { taxRate: amount }, { merge: true });
+}
+export async function getTaxRate() {
+  const snap = await getDoc(doc(db, "config", "nation"));
+  return snap.exists() ? (snap.data().taxRate ?? 500) : 500;
+}
+
+// 세금 징수 — 잔액만큼 차감, 부족분은 미납 고지서로 자동 발행
+// 반환값: { deducted: 실제차감액, shortfall: 미납액 }
+export async function collectTax(studentName, taxAmount, by) {
+  const studentRef = doc(db, "students", studentName);
+  let deducted = 0;
+  let shortfall = 0;
+
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(studentRef);
+    if (!snap.exists()) throw new Error("학생을 찾을 수 없어요");
+    const balance = snap.data().balance || 0;
+    deducted = Math.min(balance, taxAmount);
+    shortfall = taxAmount - deducted;
+    tx.update(studentRef, { balance: balance - deducted });
+  });
+
+  // 거래 기록 (차감액이 있을 때만)
+  if (deducted > 0) {
+    await addDoc(collection(db, "transactions"), {
+      name: studentName, amount: -deducted,
+      type: "세금", memo: `세금 징수${shortfall > 0 ? ` (${shortfall.toLocaleString()}원 미납)` : ""}`,
+      by, createdAt: serverTimestamp(),
+    });
+  }
+
+  // 부족분은 미납 고지서 발행
+  if (shortfall > 0) {
+    await addDoc(collection(db, "fines"), {
+      targetName: studentName, amount: shortfall,
+      reason: "세금 미납", by, paid: false,
+      createdAt: serverTimestamp(),
+    });
+  }
+
+  return { deducted, shortfall };
+}
+
+// 오프라인 납부 처리 — 잔액 건드리지 않고 고지서만 완료 처리
+export async function markTaxPaidOffline(fineId, by) {
+  await updateDoc(doc(db, "fines", fineId), {
+    paid: true, paidOffline: true, paidBy: by,
+  });
+}
+
 // 학생 조회
 export async function getStudentByName(name) {
   const snap = await getDoc(doc(db, "students", name));

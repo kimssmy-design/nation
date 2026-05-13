@@ -93,7 +93,8 @@
     getNotices, addNotice,
     getAllReports, updateReport, issueFine,
     addReport, addShopLog, getShopLogs,
-    getMissionApps, approveMission, rejectMission
+    getMissionApps, approveMission, rejectMission,
+    getTaxRate, collectTax, markTaxPaidOffline
   } from "../db.js";
 
   const session = requireLogin();
@@ -232,24 +233,23 @@
 
   // ── 세금징수원: 세금징수 ──
   async function renderTax() {
-    const students = await getAllStudents();
+    const [students, taxRate] = await Promise.all([getAllStudents(), getTaxRate()]);
     const realStudents = students.filter(s => s.role !== "테스터");
-    const taxMap = { "국회의장":1000,"감찰관":1000,"은행원":1000,"세금징수원":1000,
-      "검사":500,"매점지기":500,"주식중개인":500,"기자":500,"청소원":500,"국민":500 };
     const rows = realStudents.map(s => {
-      const tax = taxMap[s.role] || 500;
-      const canPay = (s.balance||0) >= tax;
+      const balance = s.balance || 0;
+      const shortfall = Math.max(0, taxRate - balance);
       return `
         <div class="student-check-item">
           <div class="sname">${s.name}</div>
           <div><span class="badge badge-blue">${s.role}</span></div>
-          <div class="samount">${tax.toLocaleString()}원</div>
-          <button class="btn btn-gold btn-sm tax-btn" data-name="${s.name}" data-tax="${tax}">징수</button>
-          <button class="btn btn-danger btn-sm tax-unpaid-btn" data-name="${s.name}" data-tax="${tax}">미납</button>
+          <div class="samount">${taxRate.toLocaleString()}원
+            ${shortfall > 0 ? `<div style="font-size:10px;color:var(--danger,#EF4444);">잔액 ${balance.toLocaleString()}원</div>` : ""}
+          </div>
+          <button class="btn btn-gold btn-sm tax-btn" data-name="${s.name}" data-tax="${taxRate}">징수</button>
         </div>`;
     }).join("");
     return `
-      <div class="section-title">이번 주 세금 징수 — 징수: 차감처리 / 미납: 고지서 발행</div>
+      <div class="section-title">세금 징수 — 1인당 ${taxRate.toLocaleString()}원 (잔액 부족 시 있는 만큼 차감 후 미납 고지서 자동 발행)</div>
       <div class="student-check-list">${rows}</div>`;
   }
 
@@ -266,10 +266,13 @@
             <div class="card" style="margin-bottom:10px;">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
                 <div style="font-weight:700;">${s.name}</div>
-                <div style="font-family:'Gmarket Sans';color:var(--accent2);font-size:16px;">${f.amount.toLocaleString()}원</div>
+                <div style="font-family:'Pretendard';color:var(--danger,#EF4444);font-size:16px;font-weight:800;">${f.amount.toLocaleString()}원</div>
               </div>
               <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;">사유: ${f.reason}</div>
-              <button class="btn btn-gold btn-sm pay-fine-btn" data-fineid="${f.id}" data-name="${s.name}" data-amount="${f.amount}">납부 처리</button>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="btn btn-gold btn-sm pay-fine-btn" data-fineid="${f.id}" data-name="${s.name}" data-amount="${f.amount}">💳 잔액 차감</button>
+                <button class="btn btn-outline btn-sm offline-fine-btn" data-fineid="${f.id}" data-name="${s.name}">🤝 오프라인 납부</button>
+              </div>
             </div>`;
         });
       }
@@ -592,32 +595,25 @@
       showToast(`✅ ${targets.length}명 지급 완료!`);
     };
 
-    // 세금 징수 버튼
+    // 세금 징수 버튼 — 잔액 부족해도 있는 만큼 차감, 부족분 미납 고지서 자동 발행
     document.querySelectorAll(".tax-btn").forEach(btn => {
       btn.onclick = async () => {
         const n = btn.dataset.name;
         const tax = parseInt(btn.dataset.tax);
         btn.disabled = true;
-        await addTransaction(n, -tax, "세금", "세금 납부", name);
-        btn.textContent = "✅";
-        btn.classList.remove("btn-gold");
-        btn.classList.add("btn-outline");
-        showToast(`${n} 세금 ${tax.toLocaleString()}원 징수 완료`);
-      };
-    });
-
-    // 세금 미납 버튼 → 고지서 자동 발행
-    document.querySelectorAll(".tax-unpaid-btn").forEach(btn => {
-      btn.onclick = async () => {
-        const n = btn.dataset.name;
-        const tax = parseInt(btn.dataset.tax);
-        btn.disabled = true;
         try {
-          await issueFine(n, tax, "세금 미납", name);
-          btn.textContent = "고지서발행✅";
-          btn.classList.remove("btn-danger");
-          btn.classList.add("btn-outline");
-          showToast(`📄 ${n} 세금 미납 고지서 발행!`);
+          const result = await collectTax(n, tax, name);
+          if (result.shortfall > 0) {
+            btn.textContent = `⚠️ ${result.shortfall.toLocaleString()}원 미납`;
+            btn.classList.remove("btn-gold");
+            btn.classList.add("btn-danger");
+            showToast(`${n}: ${result.deducted.toLocaleString()}원 징수, ${result.shortfall.toLocaleString()}원 미납 고지서 발행`);
+          } else {
+            btn.textContent = "✅ 징수완료";
+            btn.classList.remove("btn-gold");
+            btn.classList.add("btn-outline");
+            showToast(`${n} 세금 ${tax.toLocaleString()}원 징수 완료`);
+          }
         } catch(e) {
           showToast("오류: " + e.message, true);
           btn.disabled = false;
@@ -629,8 +625,23 @@
     document.querySelectorAll(".pay-fine-btn").forEach(btn => {
       btn.onclick = async () => {
         btn.disabled = true;
-        await payFine(btn.dataset.fineid, btn.dataset.name, parseInt(btn.dataset.amount), name);
-        showToast(`✅ ${btn.dataset.name} 납부 처리 완료!`);
+        try {
+          await payFine(btn.dataset.fineid, btn.dataset.name, parseInt(btn.dataset.amount), name);
+          showToast(`✅ ${btn.dataset.name} 잔액 차감 완료!`);
+        } catch(e) {
+          showToast("잔액 부족! 오프라인 납부 버튼을 사용해주세요", true);
+        }
+        renderPanel("fine-manage");
+      };
+    });
+
+    // 오프라인 납부 처리
+    document.querySelectorAll(".offline-fine-btn").forEach(btn => {
+      btn.onclick = async () => {
+        if (!confirm(`${btn.dataset.name} — 오프라인(현금)으로 납부 확인됐나요?`)) return;
+        btn.disabled = true;
+        await markTaxPaidOffline(btn.dataset.fineid, name);
+        showToast(`✅ ${btn.dataset.name} 오프라인 납부 처리 완료!`);
         renderPanel("fine-manage");
       };
     });

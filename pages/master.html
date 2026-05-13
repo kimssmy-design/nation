@@ -207,7 +207,7 @@
     <button class="tab-btn" onclick="switchTab('notice', this)">📢 공지 관리</button>
     <button class="tab-btn" onclick="switchTab('mission', this)">🎯 미션 관리</button>
     <button class="tab-btn" onclick="switchTab('diary', this)">📓 일지 관리</button>
-    <button class="tab-btn" onclick="switchTab('tax', this)">💼 세금 미납</button>
+    <button class="tab-btn" onclick="switchTab('tax', this)">💼 세금 관리</button>
     <button class="tab-btn" onclick="switchTab('report', this)">🚨 신고 관리</button>
     <button class="tab-btn" onclick="switchTab('money', this)">💸 가상화폐</button>
     <button class="tab-btn" onclick="switchTab('setting', this)">⚙️ 국가 설정</button>
@@ -270,8 +270,30 @@
     <div id="noticeStatList"></div>
   </div>
 
-  <!-- 세금 미납 현황 -->
+  <!-- 세금 관리 -->
   <div id="panel-tax" style="display:none;">
+
+    <!-- ① 세금 금액 설정 -->
+    <div class="card" style="margin-bottom:12px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:12px;">⚙️ 세금 금액 설정</div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <input type="number" id="taxRateInput" placeholder="예: 500" step="100" min="0"
+          style="flex:1;background:var(--card-soft);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:14px;font-family:'Pretendard',sans-serif;color:var(--text);">
+        <span style="font-size:14px;font-weight:700;color:var(--text-dim);">원 / 1인</span>
+        <button class="btn btn-gold" onclick="doSetTaxRate()">저장</button>
+      </div>
+      <div id="currentTaxRate" style="font-size:12px;color:var(--text-dim);margin-top:8px;"></div>
+    </div>
+
+    <!-- ② 일괄 세금 징수 -->
+    <div class="card" style="margin-bottom:12px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:8px;">🏛️ 전체 학생 일괄 징수</div>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;">잔액이 부족한 학생은 있는 만큼 차감 후 나머지가 미납 고지서로 발행돼요.</div>
+      <button class="btn btn-danger btn-full" onclick="doCollectAllTax()">💸 전체 학생 세금 징수하기</button>
+    </div>
+
+    <!-- ③ 미납자 목록 -->
+    <div style="font-size:13px;font-weight:700;color:var(--text-dim);margin-bottom:8px;">📋 세금 미납 현황</div>
     <div class="spinner" id="tax-spinner"></div>
     <div id="taxFineList"></div>
   </div>
@@ -506,7 +528,8 @@
     changePassword, changeRole, deleteStudent, addTransaction,
     getNotices, addNotice,
     getAllReports, updateReport,
-    issueFine, getFines, payFine, addMission, getMissions, closeMission,
+    issueFine, getFines, payFine, setTaxRate, getTaxRate, collectTax, markTaxPaidOffline,
+    addMission, getMissions, closeMission,
     getMissionApps, approveMission, rejectMission,
     getMyDiaries, getWeekDiaryCount, getThisWeekDiaries,
     addSchedule, getSchedules, deleteSchedule,
@@ -864,13 +887,61 @@
     if (tab === "report") loadReports();
     if (tab === "mission") loadMissionManage();
     if (tab === "diary") loadDiaryManage();
-    if (tab === "tax") loadTaxFines();
+    if (tab === "tax") loadTaxTab();
     if (tab === "schedule") loadScheduleManage();
   };
 
-  // 세금 미납 현황
+  // ── 세금 관리 탭 ──────────────────────────
+
+  // 탭 진입 시 현재 세금 금액 표시
+  async function loadTaxTab() {
+    const rate = await getTaxRate();
+    document.getElementById("taxRateInput").value = rate;
+    document.getElementById("currentTaxRate").textContent = `현재 설정: 1인당 ${rate.toLocaleString()}원`;
+    loadTaxFines();
+  }
+
+  // 세금 금액 저장
+  window.doSetTaxRate = async function() {
+    const amount = parseInt(document.getElementById("taxRateInput").value) || 0;
+    if (amount <= 0) return showToast("금액을 입력해주세요", true);
+    await setTaxRate(amount);
+    document.getElementById("currentTaxRate").textContent = `현재 설정: 1인당 ${amount.toLocaleString()}원`;
+    showToast(`✅ 세금 ${amount.toLocaleString()}원으로 설정 완료! 세금징수원 화면에도 바로 반영돼요.`);
+  };
+
+  // 전체 학생 일괄 징수
+  window.doCollectAllTax = async function() {
+    const rate = await getTaxRate();
+    if (!confirm(`전체 학생에게 ${rate.toLocaleString()}원 세금을 징수할까요?\n잔액 부족 학생은 있는 만큼만 차감되고 나머지는 미납 처리돼요.`)) return;
+
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = "징수 중...";
+
+    const students = await getAllStudents();
+    const targets = students.filter(s => s.role !== "테스터");
+    let collected = 0, unpaid = 0, unpaidCount = 0;
+
+    for (const s of targets) {
+      try {
+        const result = await collectTax(s.name, rate, "마스터");
+        collected += result.deducted;
+        if (result.shortfall > 0) { unpaid += result.shortfall; unpaidCount++; }
+      } catch(e) { /* 개별 오류 무시 */ }
+    }
+
+    btn.disabled = false;
+    btn.textContent = "💸 전체 학생 세금 징수하기";
+    showToast(`✅ 징수 완료! 수납 ${collected.toLocaleString()}원 / 미납 ${unpaidCount}명 (${unpaid.toLocaleString()}원)`);
+    loadTaxFines();
+  };
+
+  // 미납 현황 로드
   async function loadTaxFines() {
     document.getElementById("tax-spinner").style.display = "block";
+    document.getElementById("taxFineList").innerHTML = "";
+
     const students = await getAllStudents();
     const realStudents = students.filter(s => s.role !== "테스터");
     let html = "";
@@ -879,24 +950,27 @@
     for (const s of realStudents) {
       const fines = await getFines(s.name);
       const taxFines = fines.filter(f => !f.paid && f.reason === "세금 미납");
-      if (taxFines.length > 0) {
-        taxFines.forEach(f => {
-          totalUnpaid += f.amount;
-          const date = f.createdAt?.toDate ? f.createdAt.toDate().toLocaleDateString("ko-KR",{month:"numeric",day:"numeric"}) : "";
-          html += `
-            <div class="card" style="margin-bottom:8px;">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                <div style="font-weight:700;">${s.name} <span class="badge badge-blue" style="font-size:10px;">${s.role}</span></div>
-                <div style="font-family:'Gmarket Sans';color:var(--accent2);font-size:16px;font-weight:700;">${f.amount.toLocaleString()}원</div>
+      taxFines.forEach(f => {
+        totalUnpaid += f.amount;
+        const date = f.createdAt?.toDate
+          ? f.createdAt.toDate().toLocaleDateString("ko-KR",{month:"numeric",day:"numeric"})
+          : "";
+        html += `
+          <div class="card" style="margin-bottom:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <div style="font-weight:700;">${s.name}
+                <span class="badge badge-blue" style="font-size:10px;">${s.role}</span>
               </div>
-              <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;">발행일: ${date} · 사유: ${f.reason}</div>
-              <div style="display:flex;gap:8px;">
-                <button class="btn btn-gold btn-sm" onclick="doPayTaxFine('${f.id}','${s.name}',${f.amount})">납부 처리</button>
-                <button class="btn btn-outline btn-sm" onclick="doForgiveTax('${f.id}')">탕감</button>
-              </div>
-            </div>`;
-        });
-      }
+              <div style="font-family:'Pretendard';color:var(--danger,#EF4444);font-size:16px;font-weight:800;">${f.amount.toLocaleString()}원</div>
+            </div>
+            <div style="font-size:11px;color:var(--text-dim);margin-bottom:10px;">발행일: ${date}</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="btn btn-gold btn-sm" onclick="doPayTaxFine('${f.id}','${s.name}',${f.amount})">💳 잔액 차감 납부</button>
+              <button class="btn btn-outline btn-sm" onclick="doOfflineTax('${f.id}','${s.name}')">🤝 오프라인 납부 처리</button>
+              <button class="btn btn-danger btn-sm" style="opacity:0.7;" onclick="doForgiveTax('${f.id}')">탕감</button>
+            </div>
+          </div>`;
+      });
     }
 
     document.getElementById("tax-spinner").style.display = "none";
@@ -905,21 +979,33 @@
       document.getElementById("taxFineList").innerHTML = `<div class="empty-state"><div class="emoji">✅</div>세금 미납자가 없어요!</div>`;
       return;
     }
-
     document.getElementById("taxFineList").innerHTML = `
       <div class="card" style="margin-bottom:12px;text-align:center;">
         <div style="font-size:12px;color:var(--text-dim);margin-bottom:4px;">총 미납 세금</div>
-        <div style="font-family:'Gmarket Sans';font-size:24px;font-weight:700;color:var(--accent2);">${totalUnpaid.toLocaleString()}원</div>
-      </div>
-      ${html}`;
+        <div style="font-family:'Pretendard';font-size:24px;font-weight:800;color:var(--danger,#EF4444);">${totalUnpaid.toLocaleString()}원</div>
+      </div>${html}`;
   }
 
+  // 잔액 차감 납부 (기존과 동일 — 잔액 부족 시 오류 가능)
   window.doPayTaxFine = async function(fineId, studentName, amount) {
-    await payFine(fineId, studentName, amount, "마스터");
-    showToast(`✅ ${studentName} 세금 납부 처리 완료!`);
+    try {
+      await payFine(fineId, studentName, amount, "마스터");
+      showToast(`✅ ${studentName} 세금 잔액 차감 완료!`);
+      loadTaxFines();
+    } catch(e) {
+      showToast(`잔액 부족! 오프라인 납부 처리를 사용해주세요`, true);
+    }
+  };
+
+  // 오프라인 납부 처리 (잔액 건드리지 않음)
+  window.doOfflineTax = async function(fineId, studentName) {
+    if (!confirm(`${studentName} — 오프라인(현금)으로 납부 확인됐나요?\n잔액은 차감되지 않고 고지서만 완료 처리돼요.`)) return;
+    await markTaxPaidOffline(fineId, "마스터");
+    showToast(`✅ ${studentName} 오프라인 납부 처리 완료!`);
     loadTaxFines();
   };
 
+  // 탕감
   window.doForgiveTax = async function(fineId) {
     const { updateDoc, doc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
     const { db } = await import("../firebase.js");
