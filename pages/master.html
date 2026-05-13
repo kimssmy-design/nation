@@ -37,18 +37,66 @@
   font-family: 'Gmarket Sans', sans-serif; color: var(--gold);
 }
 
-/* 학생 테이블 */
-.student-table { width: 100%; border-collapse: collapse; }
-.student-table th {
-  background: var(--navy-mid); padding: 10px 12px;
-  text-align: left; font-size: 12px; color: var(--text-dim);
-  letter-spacing: 1px; border-bottom: 1px solid var(--navy-light);
+/* 학생 카드 리스트 */
+.student-card {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border, #E5E7EB);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
-.student-table td {
-  padding: 10px 12px; font-size: 13px;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
+.student-card:last-child { border-bottom: none; }
+.student-card-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
-.student-table tr:hover td { background: rgba(255,255,255,0.02); }
+.student-card-name {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text);
+  white-space: nowrap;
+  min-width: 52px;
+}
+.student-card-balance {
+  font-family: 'Pretendard', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary, #2563EB);
+  margin-left: auto;
+  white-space: nowrap;
+}
+.student-card-mid {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.student-card-mid select {
+  flex: 1;
+  background: var(--card-soft, #F9FAFB);
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: var(--text);
+  font-size: 13px;
+  font-family: 'Pretendard', sans-serif;
+}
+.student-card-bottom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.student-card-bottom input {
+  flex: 1;
+  background: var(--card-soft, #F9FAFB);
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: var(--text);
+  font-size: 12px;
+  font-family: 'Pretendard', sans-serif;
+  min-width: 0;
+}
 
 /* 공지 확인 현황 */
 .notice-stat-item {
@@ -172,15 +220,8 @@
       <button class="btn btn-gold btn-sm" onclick="doInitAllStudents()">🚀 전체 학생 문서 미리 생성</button>
     </div>
     <div class="spinner" id="students-spinner"></div>
-    <div class="card" style="overflow-x:auto;">
-      <table class="student-table" id="studentTable">
-        <thead>
-          <tr>
-            <th>이름</th><th>역할</th><th>보유액</th><th>가입</th><th>주식키 · 관리</th>
-          </tr>
-        </thead>
-        <tbody id="studentTbody"></tbody>
-      </table>
+    <div class="card">
+      <div id="studentTbody"></div>
     </div>
   </div>
 
@@ -526,26 +567,29 @@
       const role = s?.role || "미가입";
       const balance = s?.balance || 0;
       const stockKey = s?.stockKey || "";
+      const roleOptions = ["국민","은행원","세금징수원","매점지기","주식중개인","검사","기자","청소원","국회의장","감찰관","테스터"]
+        .map(r => `<option value="${r}" ${role===r?"selected":""}>${r}</option>`).join("");
       return `
-        <tr>
-          <td style="font-weight:700;">${name}</td>
-          <td>
-            <select onchange="doChangeRole('${name}', this.value)" style="background:var(--navy-mid);border:1px solid var(--navy-light);border-radius:6px;padding:4px 8px;color:var(--text);font-size:12px;font-family:'Noto Sans KR',sans-serif;">
-              ${["국민","은행원","세금징수원","매점지기","주식중개인","검사","기자","청소원","국회의장","감찰관","테스터"].map(r =>
-                `<option value="${r}" ${role===r?"selected":""}>${r}</option>`
-              ).join("")}
-            </select>
-          </td>
-          <td style="font-family:'Gmarket Sans';color:var(--gold);">${balance.toLocaleString()}원</td>
-          <td>${joined ? `<span class="badge badge-green">가입</span>` : `<span class="badge badge-red">미가입</span>`}</td>
-          <td style="display:flex;gap:6px;align-items:center;">
-            <input type="text" value="${stockKey}" placeholder="주식키 입력"
-              style="background:var(--navy-mid);border:1px solid var(--navy-light);border-radius:6px;padding:4px 8px;color:var(--text);font-size:12px;width:110px;font-family:'Noto Sans KR',sans-serif;"
-              id="stockkey-${name}">
+        <div class="student-card">
+          <!-- 이름 · 가입상태 · 잔액 -->
+          <div class="student-card-top">
+            <div class="student-card-name">${name}</div>
+            ${joined
+              ? `<span class="badge badge-green" style="font-size:11px;">가입</span>`
+              : `<span class="badge badge-red" style="font-size:11px;">미가입</span>`}
+            <div class="student-card-balance">${balance.toLocaleString()}원</div>
+          </div>
+          <!-- 역할 선택 -->
+          <div class="student-card-mid">
+            <select onchange="doChangeRole('${name}', this.value)">${roleOptions}</select>
+          </div>
+          <!-- 주식키 + 버튼 -->
+          <div class="student-card-bottom">
+            <input type="text" value="${stockKey}" placeholder="주식키 입력" id="stockkey-${name}">
             <button class="btn btn-gold btn-sm" onclick="doSaveStockKey('${name}')">저장</button>
             <button class="btn btn-outline btn-sm" onclick="openPwModal('${name}')">비번</button>
-          </td>
-        </tr>`;
+          </div>
+        </div>`;
     }).join("");
 
     document.getElementById("studentTbody").innerHTML = rows;
