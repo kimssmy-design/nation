@@ -65,6 +65,21 @@ export async function changeRole(name, role) {
   await updateDoc(doc(db, "students", name), { role });
 }
 
+// 학생 삭제 — students 문서 + config.studentNames 동시 제거
+export async function deleteStudent(name) {
+  // 1) students 컬렉션 문서 삭제
+  await deleteDoc(doc(db, "students", name));
+  // 2) config.studentNames에서도 제거
+  const configSnap = await getDoc(doc(db, "config", "nation"));
+  if (configSnap.exists()) {
+    const names = configSnap.data().studentNames || [];
+    await setDoc(doc(db, "config", "nation"),
+      { studentNames: names.filter(n => n !== name) },
+      { merge: true }
+    );
+  }
+}
+
 // 거래 (원자적 트랜잭션 — 동시 접근 시 잔액 오류 방지)
 export async function addTransaction(name, amount, type, memo, by) {
   const studentRef = doc(db, "students", name);

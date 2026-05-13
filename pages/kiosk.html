@@ -188,7 +188,7 @@
 
 <script type="module">
   import { requireLogin } from "../auth.js";
-  import { getAllStudents, getAllReports, getStudentByName } from "../db.js";
+  import { getAllStudents, getAllReports, getStudentByName, getNationConfig } from "../db.js";
 
   const session = requireLogin();
   if (!session) throw new Error("로그인 필요");
@@ -209,13 +209,17 @@
 
   async function loadDashboard() {
     try {
-      const [students, reports] = await Promise.all([
+      const [students, reports, config] = await Promise.all([
         getAllStudents(),
-        getAllReports()
+        getAllReports(),
+        getNationConfig()
       ]);
 
-      // 테스터 제외
-      const realStudents = students.filter(s => s.role !== "테스터");
+      // config.studentNames 기준으로 필터 (삭제된 학생 제외) + 테스터 제외
+      const validNames = config?.studentNames || [];
+      const realStudents = students.filter(s =>
+        s.role !== "테스터" && (validNames.length === 0 || validNames.includes(s.name))
+      );
 
       // 통계 카드
       const totalMoney = realStudents.reduce((s, st) => s + (st.balance || 0), 0);

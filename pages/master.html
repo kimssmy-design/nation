@@ -503,7 +503,7 @@
   import { requireMaster, clearSession } from "../auth.js";
   import {
     getAllStudents, getNationConfig, setNationConfig, initAllStudents,
-    changePassword, changeRole, addTransaction,
+    changePassword, changeRole, deleteStudent, addTransaction,
     getNotices, addNotice,
     getAllReports, updateReport,
     issueFine, getFines, payFine, addMission, getMissions, closeMission,
@@ -588,6 +588,7 @@
             <input type="text" value="${stockKey}" placeholder="주식키 입력" id="stockkey-${name}">
             <button class="btn btn-gold btn-sm" onclick="doSaveStockKey('${name}')">저장</button>
             <button class="btn btn-outline btn-sm" onclick="openPwModal('${name}')">비번</button>
+            <button class="btn btn-danger btn-sm" onclick="doDeleteStudent('${name}')">삭제</button>
           </div>
         </div>`;
     }).join("");
@@ -727,6 +728,21 @@
   };
 
   // 주식키 저장
+  // 학생 삭제
+  window.doDeleteStudent = async function(name) {
+    if (!confirm(`⚠️ "${name}" 학생을 삭제할까요?\n\nstudents 문서 + 학생 목록에서 모두 제거됩니다.\n거래/고지서 기록은 유지됩니다.`)) return;
+    try {
+      await deleteStudent(name);
+      allStudentNames = allStudentNames.filter(n => n !== name);
+      allStudents = allStudents.filter(s => s.name !== name);
+      loadStudents();
+      loadMoneyTargets();
+      showToast(`🗑️ "${name}" 삭제 완료!`);
+    } catch(e) {
+      showToast("삭제 오류: " + e.message, true);
+    }
+  };
+
   window.doSaveStockKey = async function(name) {
     const key = document.getElementById(`stockkey-${name}`).value.trim();
     const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
