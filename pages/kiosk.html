@@ -107,6 +107,46 @@
 }
 .report-meta { font-size: 11px; color: var(--text-dim); }
 
+/* 직업 현황 */
+.role-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+.role-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-dim);
+  min-width: 72px;
+  white-space: nowrap;
+}
+.role-names {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  flex: 1;
+}
+.role-badge {
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 2px 10px;
+  color: var(--text);
+}
+.role-badge.empty {
+  color: var(--text-soft);
+  border-style: dashed;
+  background: transparent;
+}
+
 /* 마지막 업데이트 */
 .last-updated {
   font-size: 11px;
@@ -168,6 +208,12 @@
   <!-- 진행 중인 신고 -->
   <div class="section-title">🚨 진행 중인 신고</div>
   <div id="reportList">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- 직업 현황 -->
+  <div class="section-title">💼 직업 현황</div>
+  <div id="roleList">
     <div class="spinner"></div>
   </div>
 
@@ -272,6 +318,67 @@
           </div>`;
         }).join("");
       }
+
+      // 직업 현황
+      const ROLE_ORDER = [
+        { role: "국회의장", emoji: "🏛️", max: 1 },
+        { role: "감찰관",   emoji: "🔍", max: 1 },
+        { role: "은행원",   emoji: "🏦", max: 1 },
+        { role: "세금징수원", emoji: "📋", max: 1 },
+        { role: "매점지기", emoji: "🛒", max: 1 },
+        { role: "주식중개인", emoji: "📈", max: 1 },
+        { role: "검사",     emoji: "⚖️", max: 1 },
+        { role: "기자",     emoji: "📰", max: 1 },
+        { role: "청소원",   emoji: "🧹", max: 6 },
+        { role: "국민",     emoji: "👤", max: 99 },
+      ];
+
+      // 역할별 그룹화
+      const roleMap = {};
+      realStudents.forEach(s => {
+        const r = s.role || "국민";
+        if (!roleMap[r]) roleMap[r] = [];
+        roleMap[r].push(s.name);
+      });
+
+      const roleRows = ROLE_ORDER
+        .filter(({ role }) => role !== "국민") // 국민은 별도 처리
+        .map(({ role, emoji, max }) => {
+          const names = roleMap[role] || [];
+          const slots = max <= 6 ? max : null; // 6명 이하면 슬롯 표시
+          let badgesHtml;
+
+          if (names.length === 0) {
+            badgesHtml = `<span class="role-badge empty">공석</span>`;
+          } else if (slots) {
+            // 슬롯 있는 경우: 최대 슬롯 수만큼 표시 (청소원: 6개 슬롯)
+            const filled = names.map(n => `<span class="role-badge">${escape(n)}</span>`);
+            const empty = Array(Math.max(0, slots - names.length)).fill(`<span class="role-badge empty">—</span>`);
+            badgesHtml = [...filled, ...empty].join("");
+          } else {
+            badgesHtml = names.map(n => `<span class="role-badge">${escape(n)}</span>`).join("");
+          }
+
+          return `<div class="role-row">
+            <span class="role-label">${emoji} ${role}</span>
+            <div class="role-names">${badgesHtml}</div>
+          </div>`;
+        });
+
+      // 국민 행 (한 줄에 묶기)
+      const nationNames = roleMap["국민"] || [];
+      const otherRoles = Object.keys(roleMap).filter(r => !ROLE_ORDER.some(o => o.role === r));
+      const allNation = [...nationNames, ...otherRoles.flatMap(r => roleMap[r])];
+      if (allNation.length > 0) {
+        roleRows.push(`<div class="role-row">
+          <span class="role-label">👤 국민</span>
+          <div class="role-names">${allNation.map(n => `<span class="role-badge">${escape(n)}</span>`).join("")}</div>
+        </div>`);
+      }
+
+      document.getElementById("roleList").innerHTML = roleRows.length
+        ? roleRows.join("")
+        : `<div class="empty-state"><div class="emoji">💼</div>직업 정보가 없어요</div>`;
 
       // 갱신 시각
       const now = new Date();
