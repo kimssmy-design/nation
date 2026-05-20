@@ -230,13 +230,17 @@
   <a href="shop.html"><span class="icon">🛒</span>매점</a>
   <a href="#" onclick="openStock()"><span class="icon">📈</span>주식</a>
   <a href="kiosk.html" class="active"><span class="icon">📊</span>현황판</a>
+  <a href="official.html" id="officialNavLink" style="display:none"><span class="icon">🏛️</span>공직자</a>
 </nav>
 
 <script type="module">
-  import { requireLogin } from "../auth.js";
+  import { requireLogin, isOfficial } from "../auth.js";
   import { getAllStudents, getAllReports, getStudentByName, getNationConfig } from "../db.js";
 
   const session = requireLogin();
+  if (session && isOfficial(session.role)) {
+    document.getElementById("officialNavLink").style.display = "";
+  }
   if (!session) throw new Error("로그인 필요");
 
   // 학생이면 주식키 로드 (마스터는 미사용)

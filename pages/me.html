@@ -347,16 +347,22 @@
   <a href="shop.html"><span class="icon">🛒</span>매점</a>
   <a href="#" onclick="openStock()"><span class="icon">📈</span>주식</a>
   <a href="kiosk.html"><span class="icon">📊</span>현황판</a>
+  <a href="official.html" id="officialNavLink" style="display:none"><span class="icon">🏛️</span>공직자</a>
 </nav>
 
 <div class="toast" id="toast"></div>
 
 <script type="module">
-  import { requireLogin, clearSession } from "../auth.js";
+  import { requireLogin, clearSession, isOfficial } from "../auth.js";
   import { getStudentByName, getTransactions, getNotices, confirmNotice, getFines, getNationConfig, getAllStudents, addDiary, getMyDiaries, getWeekDiaryCount, getMissions, applyMission, getMissionApps, getSchedules, getRewards, purchaseReward, getStudentCoupons } from "../db.js";
 
   const session = requireLogin();
   if (!session) throw new Error("로그인 필요");
+
+  // 공직자 네비 링크 표시
+  if (isOfficial(session.role)) {
+    document.getElementById("officialNavLink").style.display = "";
+  }
 
   const { name } = session;
   let currentTab = "tx";
