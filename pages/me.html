@@ -477,6 +477,12 @@
 
     const escape = str => (str || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 
+    // URL을 클릭 가능한 링크로 변환 (HTML 이스케이프 후 적용)
+    const linkify = str => escape(str).replace(
+      /(https?:\/\/[^\s<>"']+)/g,
+      '<a href="$1" target="_blank" rel="noopener" style="color:var(--primary,#2563EB);text-decoration:underline;word-break:break-all;">$1</a>'
+    );
+
     document.getElementById("noticeList").innerHTML = notices.map((n, idx) => {
       const confirmed = (n.confirmedBy || []).includes(name);
       const date = n.createdAt?.toDate ? n.createdAt.toDate().toLocaleDateString("ko-KR", { month:"numeric", day:"numeric" }) : "";
@@ -495,7 +501,7 @@
             </div>
           </div>
           <div class="notice-body" style="display:${isLatest ? "block" : "none"};">
-            <div class="notice-desc">${escape(n.content)}</div>
+            <div class="notice-desc">${linkify(n.content)}</div>
             <div class="notice-date">${date} · ${escape(n.by || "")}</div>
           </div>
         </div>`;
